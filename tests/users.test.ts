@@ -30,6 +30,15 @@ const mocks = {
   roleFindUnique: prisma.role.findUnique as jest.Mock,
 };
 
+const VALID_USER = {
+  firstName: "New",
+  lastName: "User",
+  email: "new@besttech.com",
+  phoneNumber: "+1-555-0100",
+  password: "Password@123",
+  roleId: 3,
+};
+
 beforeEach(() => {
   Object.values(mocks).forEach((fn) => fn.mockReset());
 });
@@ -44,7 +53,7 @@ describe("POST /api/users", () => {
     const res = await request(app)
       .post("/api/users")
       .set("Cookie", makeAuthCookie(FAKE_STAFF))
-      .send({ name: "New User", email: "new@besttech.com", password: "Password@123", roleId: 3 });
+      .send(VALID_USER);
 
     expect(res.status).toBe(403);
   });
@@ -58,7 +67,9 @@ describe("POST /api/users", () => {
     expect(res.status).toBe(422);
     expect(res.body.success).toBe(false);
     expect(res.body.errors).toBeDefined();
-    expect(res.body.errors.name).toBeDefined();
+    expect(res.body.errors.firstName).toBeDefined();
+    expect(res.body.errors.lastName).toBeDefined();
+    expect(res.body.errors.phoneNumber).toBeDefined();
     expect(res.body.errors.password).toBeDefined();
   });
 
@@ -80,7 +91,7 @@ describe("POST /api/users", () => {
     const res = await request(app)
       .post("/api/users")
       .set("Cookie", makeAuthCookie(FAKE_ADMIN))
-      .send({ name: "New User", email: "new@besttech.com", password: "Password@123", roleId: 3 });
+      .send(VALID_USER);
 
     expect(res.status).toBe(201);
     expect(res.body.data.email).toBe("new@besttech.com");
