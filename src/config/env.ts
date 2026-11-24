@@ -45,4 +45,17 @@ export const env = {
   cookieSameSite,
   cookieSecure,
   isProduction,
+
+  // Public URL of the frontend, used to build links in emails.
+  appUrl: (process.env.APP_URL ?? "http://localhost:5173").replace(/\/+$/, ""),
+
+  // Outgoing mail. Leave SMTP_HOST empty to print emails to the console.
+  smtp: {
+    host: process.env.SMTP_HOST?.trim() || undefined,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: parseBoolean("SMTP_SECURE", false),
+    user: process.env.SMTP_USER?.trim() || undefined,
+    pass: process.env.SMTP_PASS,
+  },
+  mailFrom: process.env.MAIL_FROM ?? "BestTech <no-reply@besttch.com>",
 };
