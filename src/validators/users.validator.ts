@@ -71,3 +71,10 @@ export const listUsersQuerySchema = z.object({
 export const toggleStatusSchema = z.object({
   status: z.enum(["active", "inactive"]),
 });
+
+export const deleteUserQuerySchema = z.object({
+  permanent: z
+    .enum(["true", "false"], { message: "permanent must be true or false" })
+    .optional()
+    .transform((value) => value === "true"),
+});

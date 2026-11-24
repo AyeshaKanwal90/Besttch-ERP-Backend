@@ -5,12 +5,14 @@ import { paginated, success } from "../utils/apiResponse";
 import { ApiError } from "../utils/ApiError";
 import {
   createUserSchema,
+  deleteUserQuerySchema,
   listUsersQuerySchema,
   toggleStatusSchema,
   updateUserSchema,
 } from "../validators/users.validator";
 import { parseOrThrow } from "../validators/validate";
 import * as usersService from "../services/users.service";
+import { hasPermission } from "../services/permissions.service";
 
 export const list = asyncHandler(async (req: Request, res: Response) => {
   const query = parseOrThrow(listUsersQuerySchema, req.query);
@@ -32,8 +34,9 @@ export const getOne = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const create = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
   const input = parseOrThrow(createUserSchema, req.body);
-  const user = await usersService.createUser(input);
+  const user = await usersService.createUser(input, req.user);
   success(res, user, "User created successfully", 201);
 });
 
@@ -46,7 +49,13 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
 
 export const remove = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
-  await usersService.deleteUser(idParam(req), req.user);
+  const { permanent } = parseOrThrow(deleteUserQuerySchema, req.query);
+
+  if (permanent && !(await hasPermission(req.user.roleName, "users.delete_permanent"))) {
+    throw ApiError.forbidden("Only a Super Admin can permanently delete users");
+  }
+
+  await usersService.deleteUser(idParam(req), req.user, { permanent });
   res.status(204).send();
 });
 

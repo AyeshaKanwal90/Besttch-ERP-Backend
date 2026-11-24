@@ -123,8 +123,9 @@ export async function createUser(input: {
   roleId: number;
   password: string;
   status?: "active" | "inactive";
-}) {
-  await assertRoleExists(input.roleId);
+}, actingUser: AuthUser) {
+  const role = await assertRoleExists(input.roleId);
+  assertCanManageRole(actingUser, role.name, "create");
   await assertEmailAvailable(input.email);
 
   const hashedPassword = await bcrypt.hash(input.password, 10);
@@ -160,7 +161,8 @@ export async function updateUser(
   const target = await findEditableTargetOrThrow(id, actingUser);
 
   if (input.roleId) {
-    await assertRoleExists(input.roleId);
+    const role = await assertRoleExists(input.roleId);
+    assertCanManageRole(actingUser, role.name, "assign");
   }
 
   if (input.email && input.email.toLowerCase() !== target.email.toLowerCase()) {
@@ -214,8 +216,26 @@ export async function updateUser(
   });
 }
 
-export async function deleteUser(id: number, actingUser: AuthUser) {
-  await findEditableTargetOrThrow(id, actingUser);
+/**
+ * Archives a user (soft delete) by default. With `permanent` the row is
+ * removed; the route only allows that for users.delete_permanent, which
+ * is super-admin only. Archived users can also be removed permanently.
+ */
+export async function deleteUser(
+  id: number,
+  actingUser: AuthUser,
+  options: { permanent: boolean } = { permanent: false }
+) {
+  if (id === actingUser.id) {
+    throw ApiError.forbidden("You cannot delete your own account");
+  }
+
+  await findEditableTargetOrThrow(id, actingUser, { includeArchived: options.permanent });
+
+  if (options.permanent) {
+    await prisma.user.delete({ where: { id } });
+    return;
+  }
 
   await prisma.user.update({
     where: {
@@ -232,6 +252,10 @@ export async function setUserStatus(
   status: "active" | "inactive",
   actingUser: AuthUser
 ) {
+  if (id === actingUser.id && status === "inactive") {
+    throw ApiError.forbidden("You cannot deactivate your own account");
+  }
+
   await findEditableTargetOrThrow(id, actingUser);
 
   return prisma.user.update({
@@ -259,6 +283,26 @@ async function assertRoleExists(roleId: number) {
       roleId: ["Selected role does not exist"],
     });
   }
+
+  return role;
+}
+
+// Roles a non-super-admin user manager may create, edit or assign.
+// From the requirements doc: admins manage staff and client users only.
+const ROLES_MANAGEABLE_BY_ADMINS: readonly string[] = [ROLES.STAFF, ROLES.CLIENT];
+
+function assertCanManageRole(actingUser: AuthUser, roleName: string, action: "create" | "assign" | "manage") {
+  if (actingUser.roleName === ROLES.SUPER_ADMIN || ROLES_MANAGEABLE_BY_ADMINS.includes(roleName)) {
+    return;
+  }
+
+  const messages = {
+    create: "You can only create staff and client users",
+    assign: "You can only assign the staff or client role",
+    manage: "You can only manage staff and client users",
+  };
+
+  throw ApiError.forbidden(messages[action]);
 }
 
 async function assertEmailAvailable(email: string) {
@@ -276,13 +320,16 @@ async function assertEmailAvailable(email: string) {
   }
 }
 
-// Admins may not modify Super Admin accounts.
-// Super Admin has no such restriction.
-async function findEditableTargetOrThrow(id: number, actingUser: AuthUser) {
+// Super admins can manage anyone; everyone else only staff and clients.
+async function findEditableTargetOrThrow(
+  id: number,
+  actingUser: AuthUser,
+  options: { includeArchived?: boolean } = {}
+) {
   const target = await prisma.user.findFirst({
     where: {
       id,
-      deletedAt: null,
+      ...(options.includeArchived ? {} : { deletedAt: null }),
     },
 
     include: {
@@ -294,12 +341,7 @@ async function findEditableTargetOrThrow(id: number, actingUser: AuthUser) {
     throw ApiError.notFound("User not found");
   }
 
-  if (
-    actingUser.roleName === ROLES.ADMIN &&
-    target.role.name === ROLES.SUPER_ADMIN
-  ) {
-    throw ApiError.forbidden("Admins cannot modify Super Admin accounts");
-  }
+  assertCanManageRole(actingUser, target.role.name, "manage");
 
   return target;
 }

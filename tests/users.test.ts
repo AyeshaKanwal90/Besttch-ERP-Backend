@@ -1,4 +1,5 @@
 import request from "supertest";
+import { Prisma } from "@prisma/client";
 
 jest.mock("../src/config/prisma", () => ({
   prisma: {
@@ -8,6 +9,7 @@ jest.mock("../src/config/prisma", () => ({
       count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
     },
     role: {
       findUnique: jest.fn(),
@@ -31,6 +33,7 @@ const mocks = {
   count: prisma.user.count as jest.Mock,
   create: prisma.user.create as jest.Mock,
   update: prisma.user.update as jest.Mock,
+  delete: prisma.user.delete as jest.Mock,
   roleFindUnique: prisma.role.findUnique as jest.Mock,
 };
 
@@ -136,5 +139,162 @@ describe("DELETE /api/users/:id", () => {
     const res = await request(app).delete("/api/users/1").set("Cookie", makeAuthCookie(FAKE_ADMIN));
 
     expect(res.status).toBe(403);
+  });
+});
+
+const ROLE_ROWS: Record<number, { id: number; name: string }> = {
+  1: { id: 1, name: "super_admin" },
+  2: { id: 2, name: "admin" },
+  3: { id: 3, name: "staff" },
+  4: { id: 4, name: "client" },
+};
+
+function existingUser(id: number, roleId: number) {
+  return { id, email: `user${id}@besttech.com`, deletedAt: null, role: ROLE_ROWS[roleId] };
+}
+
+describe("admins manage only staff and client users", () => {
+  beforeEach(() => {
+    mocks.roleFindUnique.mockImplementation(async ({ where }: { where: { id: number } }) => ROLE_ROWS[where.id] ?? null);
+    mocks.create.mockResolvedValue({ id: 20, email: "new@besttech.com" });
+    mocks.update.mockResolvedValue({ id: 5 });
+  });
+
+  it("refuses an admin creating another admin", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post("/api/users")
+      .set("Cookie", makeAuthCookie(FAKE_ADMIN))
+      .send({ ...VALID_USER, roleId: 2 });
+
+    expect(res.status).toBe(403);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("lets a super admin create an admin", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post("/api/users")
+      .set("Cookie", makeAuthCookie(FAKE_SUPER_ADMIN))
+      .send({ ...VALID_USER, roleId: 2 });
+
+    expect(res.status).toBe(201);
+  });
+
+  it("lets an admin create a client", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post("/api/users")
+      .set("Cookie", makeAuthCookie(FAKE_ADMIN))
+      .send({ ...VALID_USER, roleId: 4 });
+
+    expect(res.status).toBe(201);
+  });
+
+  it("refuses an admin editing another admin", async () => {
+    mocks.findFirst.mockResolvedValue(existingUser(7, 2));
+
+    const res = await request(app).put("/api/users/7").set("Cookie", makeAuthCookie(FAKE_ADMIN)).send({ name: "Renamed" });
+
+    expect(res.status).toBe(403);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses an admin promoting staff to admin", async () => {
+    mocks.findFirst.mockResolvedValue(existingUser(5, 3));
+
+    const res = await request(app).put("/api/users/5").set("Cookie", makeAuthCookie(FAKE_ADMIN)).send({ roleId: 2 });
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toMatch(/staff or client/);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("lets an admin edit a staff user and move them to client", async () => {
+    mocks.findFirst.mockResolvedValue(existingUser(5, 3));
+
+    const res = await request(app).put("/api/users/5").set("Cookie", makeAuthCookie(FAKE_ADMIN)).send({ roleId: 4 });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("refuses an admin deactivating another admin", async () => {
+    mocks.findFirst.mockResolvedValue(existingUser(7, 2));
+
+    const res = await request(app)
+      .patch("/api/users/7/status")
+      .set("Cookie", makeAuthCookie(FAKE_ADMIN))
+      .send({ status: "inactive" });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("refuses an admin deleting another admin", async () => {
+    mocks.findFirst.mockResolvedValue(existingUser(7, 2));
+
+    const res = await request(app).delete("/api/users/7").set("Cookie", makeAuthCookie(FAKE_ADMIN));
+
+    expect(res.status).toBe(403);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleting users", () => {
+  it("refuses deleting your own account", async () => {
+    const res = await request(app).delete(`/api/users/${FAKE_SUPER_ADMIN.id}`).set("Cookie", makeAuthCookie(FAKE_SUPER_ADMIN));
+
+    expect(res.status).toBe(403);
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("refuses deactivating your own account", async () => {
+    const res = await request(app)
+      .patch(`/api/users/${FAKE_SUPER_ADMIN.id}/status`)
+      .set("Cookie", makeAuthCookie(FAKE_SUPER_ADMIN))
+      .send({ status: "inactive" });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("refuses a permanent delete by an admin", async () => {
+    mocks.findFirst.mockResolvedValue(existingUser(5, 3));
+
+    const res = await request(app).delete("/api/users/5?permanent=true").set("Cookie", makeAuthCookie(FAKE_ADMIN));
+
+    expect(res.status).toBe(403);
+    expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("lets a super admin permanently delete, including archived users", async () => {
+    mocks.findFirst.mockResolvedValue({ ...existingUser(5, 3), deletedAt: new Date() });
+    mocks.delete.mockResolvedValue({});
+
+    const res = await request(app).delete("/api/users/5?permanent=true").set("Cookie", makeAuthCookie(FAKE_SUPER_ADMIN));
+
+    expect(res.status).toBe(204);
+    expect(mocks.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 5 } }));
+    expect(mocks.delete).toHaveBeenCalledWith({ where: { id: 5 } });
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when related records block a permanent delete", async () => {
+    mocks.findFirst.mockResolvedValue(existingUser(5, 3));
+    mocks.delete.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("fk", { code: "P2003", clientVersion: "5.22.0" })
+    );
+
+    const res = await request(app).delete("/api/users/5?permanent=true").set("Cookie", makeAuthCookie(FAKE_SUPER_ADMIN));
+
+    expect(res.status).toBe(409);
+  });
+
+  it("rejects a malformed permanent flag", async () => {
+    const res = await request(app).delete("/api/users/5?permanent=yes").set("Cookie", makeAuthCookie(FAKE_SUPER_ADMIN));
+
+    expect(res.status).toBe(422);
   });
 });

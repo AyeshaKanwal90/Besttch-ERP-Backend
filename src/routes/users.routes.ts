@@ -162,7 +162,7 @@ const router = Router();
  *     tags:
  *       - Users
  *     summary: Create a new user
- *     description: Creates a new ERP user.
+ *     description: Creates a new ERP user. Admins can only create staff and client users; super admins can create any role.
  *
  *     requestBody:
  *       required: true
@@ -251,6 +251,7 @@ router.post(
  *       - Users
  *     summary: Change user status
  *     description: >
+ *       Admins can only change staff and client users. Nobody can deactivate their own account.
  *       Activates or deactivates an existing user.
  *
  *     parameters:
@@ -390,6 +391,7 @@ router.patch(
  *       - Users
  *     summary: Update user
  *     description: >
+ *       Admins can only edit staff and client users, and can only assign the staff or client role.
  *       Updates an existing ERP user.
  *       Only fields supplied in the request are changed.
  *
@@ -469,9 +471,12 @@ router.patch(
  *       - Users
  *     summary: Delete user
  *     description: >
- *       Soft deletes an ERP user.
- *       The user's database record is retained but deletedAt
- *       is populated so the user no longer appears in normal queries.
+ *       Archives (soft deletes) an ERP user by default: the record is
+ *       kept but deletedAt is set so the user no longer appears in
+ *       normal queries. With `?permanent=true` the record is removed;
+ *       that needs `users.delete_permanent` (super admin only) and also
+ *       works on already-archived users. Admins can only delete staff
+ *       and client users. Nobody can delete their own account.
  *
  *     parameters:
  *       - in: path
@@ -481,6 +486,12 @@ router.patch(
  *         schema:
  *           type: integer
  *         example: 5
+ *       - in: query
+ *         name: permanent
+ *         schema:
+ *           type: string
+ *           enum: ["true", "false"]
+ *         description: Permanently delete instead of archiving
  *
  *     responses:
  *       204:
@@ -490,10 +501,13 @@ router.patch(
  *         description: Authentication required
  *
  *       403:
- *         description: Permission denied
+ *         description: Missing permission, target outside the caller's scope, or deleting yourself
  *
  *       404:
  *         description: User not found
+ *
+ *       409:
+ *         description: User still has related records (permanent delete only)
  */
 router.get(
   "/:id",

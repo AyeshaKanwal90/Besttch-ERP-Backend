@@ -49,6 +49,12 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
       return;
     }
 
+    // Foreign key still pointing at the row being deleted.
+    if (err.code === "P2003") {
+      failure(res, 409, "This record is still referenced by other data and can't be deleted");
+      return;
+    }
+
     // Record to update/delete does not exist.
     if (err.code === "P2025") {
       failure(res, 404, "Resource not found");
