@@ -34,7 +34,13 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
 export const create = asyncHandler(async (req: Request, res: Response) => {
   const input = parseOrThrow(createItemSchema, req.body);
 
-  const item = await itemsService.createItem(input);
+  if (!req.user) {
+    throw ApiError.unauthorized();
+  }
+
+  const item = await itemsService.createItem(input, {
+    canCreateProducts: await hasPermission(req.user.roleName, "products.create"),
+  });
 
   success(res, item, "Item added successfully", 201);
 });

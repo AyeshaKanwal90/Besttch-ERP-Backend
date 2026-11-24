@@ -73,7 +73,9 @@ router.get("/", requireAuth, requirePermission("items.view"), itemsController.li
  *       using the barcode. If the product already exists,
  *       the new physical item is added underneath that product.
  *       If the product does not exist, a new product is created
- *       before creating the item.
+ *       before creating the item. Creating (or restoring an archived)
+ *       product this way needs `products.create`; without it (staff by
+ *       default) an unknown barcode returns 403.
  *
  *     requestBody:
  *       required: true
@@ -139,6 +141,9 @@ router.get("/", requireAuth, requirePermission("items.view"), itemsController.li
  *     responses:
  *       201:
  *         description: Item created successfully
+ *
+ *       403:
+ *         description: Unknown barcode and no products.create permission
  *
  *       422:
  *         description: Validation failed

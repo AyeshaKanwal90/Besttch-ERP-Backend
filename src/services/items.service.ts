@@ -75,7 +75,10 @@ const itemSelect = {
  * 3. If not found -> create Product first.
  * 4. Create the physical Item.
  */
-export async function createItem(input: CreateItemInput) {
+export async function createItem(
+  input: CreateItemInput,
+  options: { canCreateProducts: boolean }
+) {
   await assertWarehouseExists(input.warehouseId);
 
   if (input.serialNumber) {
@@ -96,6 +99,15 @@ export async function createItem(input: CreateItemInput) {
         barcode: input.barcode,
       },
     });
+
+    /*
+     * Without products.create (staff by default) the barcode
+     * must already belong to an active product. Restoring an
+     * archived product counts as creating one.
+     */
+    if ((!product || product.deletedAt) && !options.canCreateProducts) {
+      throw ApiError.forbidden("Product not found - ask an admin to add it");
+    }
 
     /*
      * Receiving stock for an archived

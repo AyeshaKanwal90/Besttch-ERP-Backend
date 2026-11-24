@@ -305,6 +305,62 @@ describe("POST /api/items", () => {
     );
   });
 
+  it("refuses staff scanning an unknown barcode", async () => {
+    db.warehouse.findUnique.mockResolvedValue(ACTIVE_WAREHOUSE);
+    db.product.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post("/api/items")
+      .set("Cookie", makeAuthCookie(FAKE_STAFF))
+      .send({ barcode: "NEW-1", price: 5, warehouseId: 2, productName: "New thing" });
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toBe("Product not found - ask an admin to add it");
+    expect(db.product.create).not.toHaveBeenCalled();
+    expect(db.item.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses staff restoring an archived product by scanning it", async () => {
+    db.warehouse.findUnique.mockResolvedValue(ACTIVE_WAREHOUSE);
+    db.product.findUnique.mockResolvedValue({ id: 7, name: "Old", isActive: false, deletedAt: new Date() });
+
+    const res = await request(app)
+      .post("/api/items")
+      .set("Cookie", makeAuthCookie(FAKE_STAFF))
+      .send({ barcode: "OLD-1", price: 5, warehouseId: 2 });
+
+    expect(res.status).toBe(403);
+    expect(db.product.update).not.toHaveBeenCalled();
+  });
+
+  it("lets staff add an item for a known product", async () => {
+    db.warehouse.findUnique.mockResolvedValue(ACTIVE_WAREHOUSE);
+    db.product.findUnique.mockResolvedValue({ id: 7, name: "Mouse", isActive: true, deletedAt: null });
+    db.item.create.mockResolvedValue(storedItem({ productId: 7 }));
+
+    const res = await request(app)
+      .post("/api/items")
+      .set("Cookie", makeAuthCookie(FAKE_STAFF))
+      .send({ barcode: "KNOWN-1", price: 5, warehouseId: 2 });
+
+    expect(res.status).toBe(201);
+  });
+
+  it("lets an admin create the product by scanning a new barcode", async () => {
+    db.warehouse.findUnique.mockResolvedValue(ACTIVE_WAREHOUSE);
+    db.product.findUnique.mockResolvedValue(null);
+    db.product.create.mockResolvedValue({ id: 9, name: "New thing", isActive: true, deletedAt: null });
+    db.item.create.mockResolvedValue(storedItem({ productId: 9 }));
+
+    const res = await request(app)
+      .post("/api/items")
+      .set("Cookie", makeAuthCookie(FAKE_ADMIN))
+      .send({ barcode: "NEW-1", price: 5, warehouseId: 2, productName: "New thing" });
+
+    expect(res.status).toBe(201);
+    expect(db.product.create).toHaveBeenCalled();
+  });
+
   it("returns 422 when a unique constraint is hit by a concurrent insert", async () => {
     db.warehouse.findUnique.mockResolvedValue(ACTIVE_WAREHOUSE);
     db.item.findUnique.mockResolvedValue(null); // serial looked free
