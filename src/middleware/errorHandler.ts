@@ -27,6 +27,13 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
+  // express.json() rejects a body that isn't valid JSON. That's a client
+  // mistake, not a server fault.
+  if (typeof err === "object" && err !== null && (err as { type?: string }).type === "entity.parse.failed") {
+    failure(res, 400, "Request body is not valid JSON");
+    return;
+  }
+
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     // Unique constraint hit, usually two requests racing past the
     // "is this value free?" check in a service.

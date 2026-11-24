@@ -68,6 +68,16 @@ describe("POST /api/auth/login", () => {
     expect(res.body.message).toMatch(/invalid email or password/i);
   });
 
+  it("returns 400 for a body that isn't valid JSON", async () => {
+    const res = await request(app)
+      .post("/api/auth/login")
+      .set("Content-Type", "application/json")
+      .send('{"email": ');
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
   it("rejects an unknown email", async () => {
     findFirst.mockResolvedValue(null);
 
