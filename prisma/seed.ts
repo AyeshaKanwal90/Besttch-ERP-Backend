@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { DEFAULT_ROLE_PERMISSIONS, PERMISSIONS } from "../src/constants/permissions";
 
 const prisma = new PrismaClient();
 
@@ -10,21 +11,9 @@ const ROLE_DEFS = [
   { name: "client", displayName: "Client", description: "External client-portal user, limited to their own account, invoices, and orders." },
 ];
 
-const PERMISSION_DEFS = [
-  "users.view",
-  "users.create",
-  "users.update",
-  "users.delete",
-  "users.manage_status",
-  "dashboard.view",
-];
-
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-  super_admin: PERMISSION_DEFS,
-  admin: ["users.view", "users.create", "users.update", "users.delete", "users.manage_status", "dashboard.view"],
-  staff: ["dashboard.view"],
-  client: [],
-};
+// Set SEED_RESET_PERMISSIONS=true to overwrite every role's permissions
+// with the defaults. Otherwise changes made through the API are kept.
+const RESET_PERMISSIONS = process.env.SEED_RESET_PERMISSIONS === "true";
 
 const FAKE_STAFF_NAMES = [
   "Amara Chen", "Diego Fernandez", "Priya Sharma", "Liam O'Connor", "Sofia Rossi",
@@ -46,30 +35,41 @@ async function main() {
   }
 
   console.log("Seeding permissions...");
+  const alreadySeeded = new Set(
+    (await prisma.permission.findMany({ select: { name: true } })).map((p) => p.name)
+  );
   const permissions: Record<string, { id: number }> = {};
-  for (const name of PERMISSION_DEFS) {
-    const permission = await prisma.permission.upsert({
+  for (const { name, description } of PERMISSIONS) {
+    permissions[name] = await prisma.permission.upsert({
       where: { name },
-      update: {},
-      create: { name },
+      update: { description },
+      create: { name, description },
     });
-    permissions[name] = permission;
   }
 
+  // A role gets the full default set when it has nothing yet (fresh
+  // database) or on an explicit reset. Otherwise it only picks up
+  // defaults for permissions introduced by this run, so edits made by a
+  // super admin through the API survive a re-seed.
   console.log("Seeding role_permission...");
-  for (const [roleName, permissionNames] of Object.entries(ROLE_PERMISSIONS)) {
-    for (const permissionName of permissionNames) {
-      await prisma.rolePermission.upsert({
-        where: {
-          roleId_permissionId: {
-            roleId: roles[roleName].id,
-            permissionId: permissions[permissionName].id,
-          },
-        },
-        update: {},
-        create: { roleId: roles[roleName].id, permissionId: permissions[permissionName].id },
+  for (const [roleName, defaults] of Object.entries(DEFAULT_ROLE_PERMISSIONS)) {
+    const roleId = roles[roleName].id;
+    const existing = await prisma.rolePermission.count({ where: { roleId } });
+    const applyAll = RESET_PERMISSIONS || existing === 0;
+
+    if (RESET_PERMISSIONS) {
+      await prisma.rolePermission.deleteMany({ where: { roleId } });
+    }
+
+    const toGrant = applyAll ? defaults : defaults.filter((name) => !alreadySeeded.has(name));
+    if (toGrant.length) {
+      await prisma.rolePermission.createMany({
+        data: toGrant.map((name) => ({ roleId, permissionId: permissions[name].id })),
+        skipDuplicates: true,
       });
     }
+
+    console.log(`  ${roleName}: ${applyAll ? "defaults applied" : `${toGrant.length} new permission(s) granted`}`);
   }
 
   console.log("Seeding admin user...");
