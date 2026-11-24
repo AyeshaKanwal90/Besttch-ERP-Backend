@@ -50,6 +50,8 @@ describe("POST /api/auth/login", () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.email).toBe("admin@besttech.com");
     expect(res.headers["set-cookie"]?.[0]).toMatch(/besttech_token=/);
+    expect(res.headers["set-cookie"]?.[0]).toMatch(/HttpOnly/);
+    expect(res.headers["set-cookie"]?.[0]).toMatch(/SameSite=Lax/);
   });
 
   it("rejects an invalid password with a clear message", async () => {

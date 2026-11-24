@@ -7,10 +7,15 @@ import { parseOrThrow } from "../validators/validate";
 import * as authService from "../services/auth.service";
 import { ApiError } from "../utils/ApiError";
 
-const cookieOptions = {
+const baseCookieOptions = {
   httpOnly: true,
-  secure: env.isProduction,
-  sameSite: "lax" as const,
+  secure: env.cookieSecure,
+  sameSite: env.cookieSameSite,
+  path: "/",
+};
+
+const cookieOptions = {
+  ...baseCookieOptions,
   maxAge: 24 * 60 * 60 * 1000,
 };
 
@@ -23,7 +28,8 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const logout = asyncHandler(async (_req: Request, res: Response) => {
-  res.clearCookie(env.cookieName, { httpOnly: true, secure: env.isProduction, sameSite: "lax" });
+  // Must match the attributes the cookie was set with or browsers keep it.
+  res.clearCookie(env.cookieName, baseCookieOptions);
   success(res, null, "Logged out successfully");
 });
 
