@@ -4,6 +4,8 @@ import { prisma } from "../config/prisma";
 import { env } from "../config/env";
 import { ApiError } from "../utils/ApiError";
 import { AuthUser } from "../types/express";
+import { PERMISSION_NAMES } from "../constants/permissions";
+import { getRolePermissions } from "./permissions.service";
 
 export async function login(email: string, password: string) {
   const user = await prisma.user.findFirst({
@@ -28,7 +30,7 @@ export async function login(email: string, password: string) {
   const payload: AuthUser = { id: user.id, email: user.email, roleId: user.roleId, roleName: user.role.name };
   const token = jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn } as SignOptions);
 
-  return { token, user: toSafeUser(user) };
+  return { token, user: await withPermissions(toSafeUser(user)) };
 }
 
 export async function updateOwnProfile(
@@ -57,7 +59,7 @@ export async function updateOwnProfile(
     include: { role: true },
   });
 
-  return toSafeUser(updated);
+  return withPermissions(toSafeUser(updated));
 }
 
 export async function getCurrentUser(userId: number) {
@@ -70,7 +72,16 @@ export async function getCurrentUser(userId: number) {
     throw ApiError.unauthorized("Session user no longer exists");
   }
 
-  return toSafeUser(user);
+  return withPermissions(toSafeUser(user));
+}
+
+/**
+ * Adds the user's effective permissions (in catalogue order) so the
+ * frontend can decide what to show without hardcoding role names.
+ */
+async function withPermissions<T extends { role: { name: string } }>(user: T) {
+  const granted = await getRolePermissions(user.role.name);
+  return { ...user, permissions: PERMISSION_NAMES.filter((name) => granted.has(name)) };
 }
 
 function toSafeUser(user: {

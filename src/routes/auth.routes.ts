@@ -68,7 +68,7 @@ router.post("/logout", authController.logout);
  *     tags:
  *       - Authentication
  *     summary: Get current user
- *     description: Returns the currently authenticated user's profile.
+ *     description: Returns the currently authenticated user's profile, including a `permissions` array (the role's effective permissions) for showing or hiding UI. Login and profile updates return the same shape. Available to every role, including client.
  *     responses:
  *       200:
  *         description: Current user retrieved successfully

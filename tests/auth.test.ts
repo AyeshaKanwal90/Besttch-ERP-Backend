@@ -7,11 +7,17 @@ jest.mock("../src/config/prisma", () => ({
       findFirst: jest.fn(),
       update: jest.fn(),
     },
+    rolePermission: {
+      findMany: jest.fn(),
+    },
   },
 }));
 
 import { prisma } from "../src/config/prisma";
 import { createApp } from "../src/app";
+import { PERMISSION_NAMES } from "../src/constants/permissions";
+import { FAKE_CLIENT, FAKE_STAFF, makeAuthCookie } from "./helpers/authToken";
+import { useDefaultPermissions } from "./helpers/permissions";
 
 const app = createApp();
 const findFirst = prisma.user.findFirst as jest.Mock;
@@ -52,6 +58,8 @@ describe("POST /api/auth/login", () => {
     expect(res.headers["set-cookie"]?.[0]).toMatch(/besttech_token=/);
     expect(res.headers["set-cookie"]?.[0]).toMatch(/HttpOnly/);
     expect(res.headers["set-cookie"]?.[0]).toMatch(/SameSite=Lax/);
+    expect(res.body.data.permissions).toEqual([...PERMISSION_NAMES]);
+    expect(res.body.data.password).toBeUndefined();
   });
 
   it("rejects an invalid password with a clear message", async () => {
@@ -91,6 +99,30 @@ describe("POST /api/auth/login", () => {
 });
 
 describe("GET /api/auth/me", () => {
+  beforeEach(() => {
+    findFirst.mockReset();
+    useDefaultPermissions(prisma.rolePermission.findMany as jest.Mock);
+  });
+
+  it("includes the staff role's permissions", async () => {
+    findFirst.mockResolvedValue({ ...SEEDED_USER, id: 3, roleId: 3, role: { id: 3, name: "staff", displayName: "Staff" } });
+
+    const res = await request(app).get("/api/auth/me").set("Cookie", makeAuthCookie(FAKE_STAFF));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.permissions).toContain("items.update");
+    expect(res.body.data.permissions).not.toContain("products.create");
+  });
+
+  it("lets a client read their own profile", async () => {
+    findFirst.mockResolvedValue({ ...SEEDED_USER, id: 4, roleId: 4, role: { id: 4, name: "client", displayName: "Client" } });
+
+    const res = await request(app).get("/api/auth/me").set("Cookie", makeAuthCookie(FAKE_CLIENT));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.permissions).toEqual(["crm.contacts.view.own", "shipments.view.own", "invoices.view.own", "accounts.view.own", "support.create.own"]);
+  });
+
   it("rejects a request without a token", async () => {
     const res = await request(app).get("/api/auth/me");
     expect(res.status).toBe(401);
