@@ -7,7 +7,7 @@ node_modules/
 .env.*.local
 
 # Build output
-server/dist/
+dist/
 client/dist/
 client/build/
 
@@ -22,7 +22,7 @@ npm-debug.log*
 Thumbs.db
 
 # Prisma
-server/prisma/*.db
+prisma/*.db
 
 # Test coverage
 coverage/
