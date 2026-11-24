@@ -5,13 +5,5 @@ export const ROLES = {
   CLIENT: "client",
 } as const;
 
-// Roles allowed into the internal admin app in Phase 1. Client is an
-// external-portal role (see docs/DECISIONS.md) and has no UI here yet.
-export const INTERNAL_ROLES = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.STAFF] as const;
-
-// Only these roles may manage the users module.
-export const USER_MANAGER_ROLES = [ROLES.SUPER_ADMIN, ROLES.ADMIN] as const;
-
-// Roles that may create, edit and delete products and warehouses.
-// Staff can still view them and work with individual items.
-export const INVENTORY_MANAGER_ROLES = [ROLES.SUPER_ADMIN, ROLES.ADMIN] as const;
+// Route access is permission-based; see constants/permissions.ts for
+// what each role can do by default.

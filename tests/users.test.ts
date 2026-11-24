@@ -12,12 +12,16 @@ jest.mock("../src/config/prisma", () => ({
     role: {
       findUnique: jest.fn(),
     },
+    rolePermission: {
+      findMany: jest.fn(),
+    },
   },
 }));
 
 import { prisma } from "../src/config/prisma";
 import { createApp } from "../src/app";
 import { makeAuthCookie, FAKE_ADMIN, FAKE_STAFF, FAKE_SUPER_ADMIN } from "./helpers/authToken";
+import { useDefaultPermissions } from "./helpers/permissions";
 
 const app = createApp();
 
@@ -41,6 +45,7 @@ const VALID_USER = {
 
 beforeEach(() => {
   Object.values(mocks).forEach((fn) => fn.mockReset());
+  useDefaultPermissions(prisma.rolePermission.findMany as jest.Mock);
 });
 
 describe("POST /api/users", () => {

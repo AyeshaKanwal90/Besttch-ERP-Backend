@@ -1,7 +1,6 @@
 import { Router } from "express";
 import * as dashboardController from "../controllers/dashboard.controller";
-import { requireAuth, requireRole } from "../middleware/auth";
-import { INTERNAL_ROLES } from "../constants/roles";
+import { requireAuth, requirePermission } from "../middleware/auth";
 
 const router = Router();
 
@@ -31,7 +30,7 @@ const router = Router();
 router.get(
   "/stats",
   requireAuth,
-  requireRole(...INTERNAL_ROLES),
+  requirePermission("dashboard.view"),
   dashboardController.stats
 );
 

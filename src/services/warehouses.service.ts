@@ -263,7 +263,7 @@ export async function updateWarehouse(id: number, input: UpdateWarehouseInput) {
  *
  * We don't physically delete the warehouse.
  *
- * Role check lives on the route (INVENTORY_MANAGER_ROLES).
+ * Permission check lives on the route.
  */
 export async function deleteWarehouse(id: number) {
   const warehouse = await prisma.warehouse.findUnique({

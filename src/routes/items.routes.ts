@@ -1,8 +1,7 @@
 import { Router } from "express";
 
 import * as itemsController from "../controllers/items.controller";
-import { requireAuth, requireRole } from "../middleware/auth";
-import { INTERNAL_ROLES } from "../constants/roles";
+import { requireAuth, requirePermission } from "../middleware/auth";
 
 const router = Router();
 
@@ -15,7 +14,7 @@ const router = Router();
  *     summary: Get all items
  *     description: >
  *       Returns individual physical inventory items.
- *       Available to super admin, admin and staff.
+ *       Requires `items.view`.
  *       Search supports item ID, item name, item code,
  *       serial number, product name, SKU and barcode.
  *     parameters:
@@ -60,7 +59,7 @@ const router = Router();
  *       200:
  *         description: Items retrieved successfully
  */
-router.get("/", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.list);
+router.get("/", requireAuth, requirePermission("items.view"), itemsController.list);
 
 /**
  * @openapi
@@ -144,7 +143,7 @@ router.get("/", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.lis
  *       422:
  *         description: Validation failed
  */
-router.post("/", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.create);
+router.post("/", requireAuth, requirePermission("items.create"), itemsController.create);
 
 /**
  * @openapi
@@ -173,7 +172,7 @@ router.post("/", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.cr
  *       404:
  *         description: Item not found
  */
-router.get("/serial/:serialNumber", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.getBySerial);
+router.get("/serial/:serialNumber", requireAuth, requirePermission("items.view"), itemsController.getBySerial);
 
 /**
  * @openapi
@@ -198,7 +197,7 @@ router.get("/serial/:serialNumber", requireAuth, requireRole(...INTERNAL_ROLES),
  *       404:
  *         description: Item not found
  */
-router.get("/code/:itemCode", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.getByCode);
+router.get("/code/:itemCode", requireAuth, requirePermission("items.view"), itemsController.getByCode);
 
 /**
  * @openapi
@@ -223,7 +222,7 @@ router.get("/code/:itemCode", requireAuth, requireRole(...INTERNAL_ROLES), items
  *       404:
  *         description: Item not found
  */
-router.get("/:id", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.getOne);
+router.get("/:id", requireAuth, requirePermission("items.view"), itemsController.getOne);
 
 /**
  * @openapi
@@ -234,9 +233,9 @@ router.get("/:id", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.
  *     summary: Update an item
  *     description: >
  *       Update the individual item's name, serial number,
- *       price or warehouse. Staff may move items and edit
- *       name/serial, but only super admin and admin can
- *       change the price (sending the current price is allowed).
+ *       price or warehouse. Requires `items.update`. Changing the price also
+ *       requires `items.update_price` (not granted to staff by
+ *       default); re-sending the current price is allowed.
  *
  *     parameters:
  *       - in: path
@@ -278,7 +277,7 @@ router.get("/:id", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.
  *         description: Item updated successfully
  *
  *       403:
- *         description: Staff cannot change item prices
+ *         description: Missing items.update or items.update_price
  *
  *       404:
  *         description: Item not found
@@ -286,7 +285,7 @@ router.get("/:id", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.
  *       422:
  *         description: Validation failed
  */
-router.put("/:id", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.update);
+router.put("/:id", requireAuth, requirePermission("items.update"), itemsController.update);
 
 /**
  * @openapi
@@ -317,7 +316,7 @@ router.put("/:id", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.
  *       422:
  *         description: Item is not currently in stock
  */
-router.post("/:id/sell", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.sell);
+router.post("/:id/sell", requireAuth, requirePermission("items.change_status"), itemsController.sell);
 
 /**
  * @openapi
@@ -346,7 +345,7 @@ router.post("/:id/sell", requireAuth, requireRole(...INTERNAL_ROLES), itemsContr
  *       422:
  *         description: Item is not currently in stock
  */
-router.post("/:id/remove", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.remove);
+router.post("/:id/remove", requireAuth, requirePermission("items.change_status"), itemsController.remove);
 
 /**
  * @openapi
@@ -376,6 +375,6 @@ router.post("/:id/remove", requireAuth, requireRole(...INTERNAL_ROLES), itemsCon
  *       422:
  *         description: Item is already in stock
  */
-router.post("/:id/return", requireAuth, requireRole(...INTERNAL_ROLES), itemsController.returnItem);
+router.post("/:id/return", requireAuth, requirePermission("items.change_status"), itemsController.returnItem);
 
 export default router;

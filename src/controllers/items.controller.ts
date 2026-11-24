@@ -14,6 +14,7 @@ import {
 
 import { parseOrThrow } from "../validators/validate";
 import * as itemsService from "../services/items.service";
+import { hasPermission } from "../services/permissions.service";
 
 export const list = asyncHandler(async (req: Request, res: Response) => {
   const query = parseOrThrow(listItemsQuerySchema, req.query);
@@ -63,7 +64,9 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.unauthorized();
   }
 
-  const item = await itemsService.updateItem(idParam(req), input, req.user);
+  const item = await itemsService.updateItem(idParam(req), input, {
+    canUpdatePrice: await hasPermission(req.user.roleName, "items.update_price"),
+  });
 
   success(res, item, "Item updated successfully");
 });

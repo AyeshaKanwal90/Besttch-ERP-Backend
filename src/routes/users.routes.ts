@@ -1,9 +1,8 @@
 import { Router } from "express";
 
 import * as usersController from "../controllers/users.controller";
-import { requireAuth, requireRole } from "../middleware/auth";
+import { requireAuth, requirePermission } from "../middleware/auth";
 
-import { USER_MANAGER_ROLES } from "../constants/roles";
 
 const router = Router();
 
@@ -233,14 +232,14 @@ const router = Router();
 router.get(
   "/",
   requireAuth,
-  requireRole(...USER_MANAGER_ROLES),
+  requirePermission("users.view"),
   usersController.list
 );
 
 router.post(
   "/",
   requireAuth,
-  requireRole(...USER_MANAGER_ROLES),
+  requirePermission("users.create"),
   usersController.create
 );
 
@@ -303,7 +302,7 @@ router.post(
 router.patch(
   "/:id/status",
   requireAuth,
-  requireRole(...USER_MANAGER_ROLES),
+  requirePermission("users.manage_status"),
   usersController.setStatus
 );
 
@@ -499,21 +498,21 @@ router.patch(
 router.get(
   "/:id",
   requireAuth,
-  requireRole(...USER_MANAGER_ROLES),
+  requirePermission("users.view"),
   usersController.getOne
 );
 
 router.put(
   "/:id",
   requireAuth,
-  requireRole(...USER_MANAGER_ROLES),
+  requirePermission("users.update"),
   usersController.update
 );
 
 router.delete(
   "/:id",
   requireAuth,
-  requireRole(...USER_MANAGER_ROLES),
+  requirePermission("users.delete"),
   usersController.remove
 );
 

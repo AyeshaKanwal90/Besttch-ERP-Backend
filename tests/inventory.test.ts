@@ -18,6 +18,9 @@ jest.mock("../src/config/prisma", () => {
       create: jest.fn(),
       update: jest.fn(),
     },
+    rolePermission: {
+      findMany: jest.fn(),
+    },
     warehouse: {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
@@ -43,6 +46,7 @@ import {
   FAKE_STAFF,
   FAKE_SUPER_ADMIN,
 } from "./helpers/authToken";
+import { useDefaultPermissions } from "./helpers/permissions";
 
 const app = createApp();
 
@@ -50,6 +54,7 @@ const db = prisma as unknown as {
   product: Record<string, jest.Mock>;
   item: Record<string, jest.Mock>;
   warehouse: Record<string, jest.Mock>;
+  rolePermission: Record<string, jest.Mock>;
 };
 
 const ACTIVE_WAREHOUSE = { id: 2, name: "Second", code: "SEC", isActive: true };
@@ -80,6 +85,7 @@ beforeEach(() => {
   for (const model of [db.product, db.item, db.warehouse]) {
     Object.values(model).forEach((fn) => fn.mockReset());
   }
+  useDefaultPermissions(db.rolePermission.findMany);
 });
 
 describe("inventory access by role", () => {
@@ -141,6 +147,18 @@ describe("PUT /api/items/:id as staff", () => {
 
     expect(res.status).toBe(403);
     expect(db.item.update).not.toHaveBeenCalled();
+  });
+
+  it("lets an admin change the price", async () => {
+    db.item.findUnique.mockResolvedValue(storedItem());
+    db.item.update.mockResolvedValue(storedItem({ price: new Prisma.Decimal(99) }));
+
+    const res = await request(app)
+      .put("/api/items/1")
+      .set("Cookie", makeAuthCookie(FAKE_ADMIN))
+      .send({ price: 99 });
+
+    expect(res.status).toBe(200);
   });
 
   it("moves an item to another warehouse (re-sending the same price is fine)", async () => {

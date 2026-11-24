@@ -246,7 +246,7 @@ export async function updateProduct(id: number, input: UpdateProductInput) {
   return formatProduct(product);
 }
 
-// Role check lives on the route (INVENTORY_MANAGER_ROLES).
+// Permission check lives on the route.
 export async function deleteProduct(id: number) {
   const product = await prisma.product.findFirst({
     where: {

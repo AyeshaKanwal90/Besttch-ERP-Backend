@@ -1,8 +1,7 @@
 import { Router } from "express";
 
 import * as productsController from "../controllers/products.controller";
-import { requireAuth, requireRole } from "../middleware/auth";
-import { INTERNAL_ROLES, INVENTORY_MANAGER_ROLES } from "../constants/roles";
+import { requireAuth, requirePermission } from "../middleware/auth";
 
 const router = Router();
 
@@ -13,7 +12,7 @@ const router = Router();
  *     tags:
  *       - Products
  *     summary: Get all products
- *     description: Returns all products with quantity calculated from in-stock items. Supports search by product name, SKU, barcode or product ID. Available to super admin, admin and staff.
+ *     description: Returns all products with quantity calculated from in-stock items. Supports search by product name, SKU, barcode or product ID. Requires `products.view`.
  *     parameters:
  *       - in: query
  *         name: search
@@ -35,7 +34,7 @@ const router = Router();
  *       200:
  *         description: Products retrieved successfully
  */
-router.get("/", requireAuth, requireRole(...INTERNAL_ROLES), productsController.list);
+router.get("/", requireAuth, requirePermission("products.view"), productsController.list);
 
 /**
  * @openapi
@@ -44,7 +43,7 @@ router.get("/", requireAuth, requireRole(...INTERNAL_ROLES), productsController.
  *     tags:
  *       - Products
  *     summary: Create a product
- *     description: Super admin and admin only.
+ *     description: Requires `products.create` (super admin and admin by default).
  *     requestBody:
  *       required: true
  *       content:
@@ -79,11 +78,11 @@ router.get("/", requireAuth, requireRole(...INTERNAL_ROLES), productsController.
  *       201:
  *         description: Product created successfully
  *       403:
- *         description: Only super admin or admin can create products
+ *         description: Missing the products.create permission
  *       422:
  *         description: Validation failed
  */
-router.post("/", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), productsController.create);
+router.post("/", requireAuth, requirePermission("products.create"), productsController.create);
 
 /**
  * @openapi
@@ -105,7 +104,7 @@ router.post("/", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), productsC
  *       404:
  *         description: Product not found
  */
-router.get("/barcode/:barcode", requireAuth, requireRole(...INTERNAL_ROLES), productsController.getByBarcode);
+router.get("/barcode/:barcode", requireAuth, requirePermission("products.view"), productsController.getByBarcode);
 
 /**
  * @openapi
@@ -127,7 +126,7 @@ router.get("/barcode/:barcode", requireAuth, requireRole(...INTERNAL_ROLES), pro
  *       404:
  *         description: Product not found
  */
-router.get("/sku/:sku", requireAuth, requireRole(...INTERNAL_ROLES), productsController.getBySku);
+router.get("/sku/:sku", requireAuth, requirePermission("products.view"), productsController.getBySku);
 
 /**
  * @openapi
@@ -149,7 +148,7 @@ router.get("/sku/:sku", requireAuth, requireRole(...INTERNAL_ROLES), productsCon
  *       404:
  *         description: Product not found
  */
-router.get("/:id", requireAuth, requireRole(...INTERNAL_ROLES), productsController.getOne);
+router.get("/:id", requireAuth, requirePermission("products.view"), productsController.getOne);
 
 /**
  * @openapi
@@ -158,7 +157,7 @@ router.get("/:id", requireAuth, requireRole(...INTERNAL_ROLES), productsControll
  *     tags:
  *       - Products
  *     summary: Update a product
- *     description: Super admin and admin only.
+ *     description: Requires `products.update` (super admin and admin by default).
  *     parameters:
  *       - in: path
  *         name: id
@@ -194,13 +193,13 @@ router.get("/:id", requireAuth, requireRole(...INTERNAL_ROLES), productsControll
  *       200:
  *         description: Product updated successfully
  *       403:
- *         description: Only super admin or admin can update products
+ *         description: Missing the products.update permission
  *       404:
  *         description: Product not found
  *       422:
  *         description: Validation failed
  */
-router.put("/:id", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), productsController.update);
+router.put("/:id", requireAuth, requirePermission("products.update"), productsController.update);
 
 /**
  * @openapi
@@ -209,7 +208,7 @@ router.put("/:id", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), product
  *     tags:
  *       - Products
  *     summary: Delete a product
- *     description: Soft deletes the product. Super admin and admin only. Product cannot be deleted while items are still in stock.
+ *     description: Soft deletes the product. Requires `products.delete` (super admin and admin by default). Product cannot be deleted while items are still in stock.
  *     parameters:
  *       - in: path
  *         name: id
@@ -220,12 +219,12 @@ router.put("/:id", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), product
  *       204:
  *         description: Product deleted successfully
  *       403:
- *         description: Only super admin or admin can delete products
+ *         description: Missing the products.delete permission
  *       404:
  *         description: Product not found
  *       422:
  *         description: Product still has items in stock
  */
-router.delete("/:id", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), productsController.remove);
+router.delete("/:id", requireAuth, requirePermission("products.delete"), productsController.remove);
 
 export default router;
