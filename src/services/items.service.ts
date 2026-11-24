@@ -87,15 +87,34 @@ export async function createItem(input: CreateItemInput) {
   return prisma.$transaction(async (tx) => {
     /*
      * Barcode determines whether this
-     * product already exists.
+     * product already exists. Archived
+     * products are included because the
+     * barcode column is unique: creating a
+     * second product with the same barcode
+     * would fail on the index.
      */
-    let product = await tx.product.findFirst({
+    let product = await tx.product.findUnique({
       where: {
         barcode: input.barcode,
-
-        deletedAt: null,
       },
     });
+
+    /*
+     * Receiving stock for an archived
+     * product brings it back.
+     */
+    if (product?.deletedAt) {
+      product = await tx.product.update({
+        where: {
+          id: product.id,
+        },
+
+        data: {
+          deletedAt: null,
+          isActive: true,
+        },
+      });
+    }
 
     /*
      * Product doesn't exist.
@@ -124,7 +143,11 @@ export async function createItem(input: CreateItemInput) {
 
       if (existingSku) {
         throw ApiError.unprocessable("Validation failed", {
-          sku: ["SKU is already in use"],
+          sku: [
+            existingSku.deletedAt
+              ? "SKU belongs to an archived product"
+              : "SKU is already in use",
+          ],
         });
       }
 

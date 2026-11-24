@@ -301,7 +301,11 @@ async function assertSkuAvailable(sku: string, excludeId?: number) {
 
   if (existing) {
     throw ApiError.unprocessable("Validation failed", {
-      sku: ["SKU is already in use"],
+      sku: [
+        existing.deletedAt
+          ? "SKU belongs to an archived product"
+          : "SKU is already in use",
+      ],
     });
   }
 }
@@ -323,7 +327,11 @@ async function assertBarcodeAvailable(barcode: string, excludeId?: number) {
 
   if (existing) {
     throw ApiError.unprocessable("Validation failed", {
-      barcode: ["Barcode is already in use"],
+      barcode: [
+        existing.deletedAt
+          ? "Barcode belongs to an archived product"
+          : "Barcode is already in use",
+      ],
     });
   }
 }

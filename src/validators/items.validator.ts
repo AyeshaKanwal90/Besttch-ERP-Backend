@@ -60,12 +60,15 @@ export const updateItemSchema = z.object({
     .optional()
     .nullable(),
 
+  // An empty serial clears it. Storing "" would collide on the
+  // unique index the second time any item is saved without one.
   serialNumber: z
     .string()
     .trim()
     .max(100, "Serial number cannot exceed 100 characters")
     .optional()
-    .nullable(),
+    .nullable()
+    .transform((value) => (value === "" ? null : value)),
 
   price: z.coerce
     .number()
