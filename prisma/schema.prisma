@@ -70,6 +70,8 @@ model User {
   phone       String?    @db.VarChar(30)
   avatarUrl   String?    @map("avatar_url") @db.VarChar(255)
   status      UserStatus @default(active)
+  // Embedded in every JWT. Bumping it logs out all of the user's sessions.
+  tokenVersion Int       @default(0) @map("token_version")
   lastLoginAt DateTime?  @map("last_login_at")
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")

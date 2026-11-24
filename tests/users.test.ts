@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 jest.mock("../src/config/prisma", () => ({
   prisma: {
     user: {
+      findUnique: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
@@ -22,7 +23,7 @@ jest.mock("../src/config/prisma", () => ({
 
 import { prisma } from "../src/config/prisma";
 import { createApp } from "../src/app";
-import { makeAuthCookie, FAKE_ADMIN, FAKE_STAFF, FAKE_SUPER_ADMIN } from "./helpers/authToken";
+import { makeAuthCookie, useValidSessions, FAKE_ADMIN, FAKE_STAFF, FAKE_SUPER_ADMIN } from "./helpers/authToken";
 import { useDefaultPermissions } from "./helpers/permissions";
 
 const app = createApp();
@@ -49,6 +50,7 @@ const VALID_USER = {
 beforeEach(() => {
   Object.values(mocks).forEach((fn) => fn.mockReset());
   useDefaultPermissions(prisma.rolePermission.findMany as jest.Mock);
+  useValidSessions(prisma.user.findUnique as jest.Mock);
 });
 
 describe("POST /api/users", () => {
@@ -125,7 +127,7 @@ describe("DELETE /api/users/:id", () => {
     expect(res.status).toBe(204);
     expect(mocks.update).toHaveBeenCalledWith({
       where: { id: 5 },
-      data: { deletedAt: expect.any(Date) },
+      data: { deletedAt: expect.any(Date), tokenVersion: { increment: 1 } },
     });
   });
 

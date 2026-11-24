@@ -2,7 +2,7 @@ import express from "express";
 import request from "supertest";
 
 jest.mock("../src/config/prisma", () => ({
-  prisma: { rolePermission: { findMany: jest.fn() } },
+  prisma: { rolePermission: { findMany: jest.fn() }, user: { findUnique: jest.fn() } },
 }));
 
 import { prisma } from "../src/config/prisma";
@@ -15,7 +15,7 @@ import { requireAuth, requirePermission } from "../src/middleware/auth";
 import { errorHandler } from "../src/middleware/errorHandler";
 import { clearPermissionCache, getRolePermissions } from "../src/services/permissions.service";
 import cookieParser from "cookie-parser";
-import { FAKE_ADMIN, FAKE_STAFF, FAKE_SUPER_ADMIN, makeAuthCookie } from "./helpers/authToken";
+import { FAKE_ADMIN, FAKE_STAFF, FAKE_SUPER_ADMIN, makeAuthCookie, useValidSessions } from "./helpers/authToken";
 
 const findMany = prisma.rolePermission.findMany as jest.Mock;
 
@@ -26,6 +26,7 @@ function rowsFor(names: readonly string[]) {
 beforeEach(() => {
   findMany.mockReset();
   clearPermissionCache();
+  useValidSessions(prisma.user.findUnique as jest.Mock);
 });
 
 describe("default role permissions", () => {

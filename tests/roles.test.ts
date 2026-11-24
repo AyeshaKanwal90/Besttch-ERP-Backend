@@ -5,6 +5,7 @@ jest.mock("../src/config/prisma", () => {
     role: { findUnique: jest.fn(), findMany: jest.fn() },
     permission: { createMany: jest.fn(), findMany: jest.fn() },
     rolePermission: { findMany: jest.fn(), deleteMany: jest.fn(), createMany: jest.fn() },
+    user: { findUnique: jest.fn() },
   };
   prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
   return { prisma };
@@ -13,7 +14,7 @@ jest.mock("../src/config/prisma", () => {
 import { prisma } from "../src/config/prisma";
 import { createApp } from "../src/app";
 import { PERMISSION_NAMES } from "../src/constants/permissions";
-import { makeAuthCookie, FAKE_ADMIN, FAKE_STAFF, FAKE_SUPER_ADMIN } from "./helpers/authToken";
+import { makeAuthCookie, useValidSessions, FAKE_ADMIN, FAKE_STAFF, FAKE_SUPER_ADMIN } from "./helpers/authToken";
 import { useDefaultPermissions } from "./helpers/permissions";
 
 const app = createApp();
@@ -31,6 +32,7 @@ beforeEach(() => {
     Object.values(model).forEach((fn) => fn.mockReset());
   }
   useDefaultPermissions(db.rolePermission.findMany);
+  useValidSessions(db.user.findUnique);
   db.role.findUnique.mockImplementation(async ({ where }: { where: { id: number } }) => ROLES_BY_ID[where.id] ?? null);
   db.permission.findMany.mockImplementation(async ({ where }: { where: { name: { in: string[] } } }) =>
     where.name.in.map((name, i) => ({ id: i + 1, name }))

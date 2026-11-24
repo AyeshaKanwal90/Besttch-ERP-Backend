@@ -210,6 +210,13 @@ export async function updateUser(
             status: input.status,
           }
         : {}),
+
+      // A new password or deactivation ends the user's sessions.
+      ...(input.password || input.status === "inactive"
+        ? {
+            tokenVersion: { increment: 1 },
+          }
+        : {}),
     },
 
     select: userSelect,
@@ -243,6 +250,7 @@ export async function deleteUser(
     },
     data: {
       deletedAt: new Date(),
+      tokenVersion: { increment: 1 },
     },
   });
 }
@@ -265,6 +273,7 @@ export async function setUserStatus(
 
     data: {
       status,
+      ...(status === "inactive" ? { tokenVersion: { increment: 1 } } : {}),
     },
 
     select: userSelect,

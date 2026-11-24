@@ -27,10 +27,24 @@ export async function login(email: string, password: string) {
     data: { lastLoginAt: new Date() },
   });
 
-  const payload: AuthUser = { id: user.id, email: user.email, roleId: user.roleId, roleName: user.role.name };
-  const token = jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn } as SignOptions);
+  return { token: signSessionToken(user), user: await withPermissions(toSafeUser(user)) };
+}
 
-  return { token, user: await withPermissions(toSafeUser(user)) };
+export function signSessionToken(user: {
+  id: number;
+  email: string;
+  roleId: number;
+  tokenVersion: number;
+  role: { name: string };
+}) {
+  const payload: AuthUser = {
+    id: user.id,
+    email: user.email,
+    roleId: user.roleId,
+    roleName: user.role.name,
+    tokenVersion: user.tokenVersion,
+  };
+  return jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn } as SignOptions);
 }
 
 export async function updateOwnProfile(
@@ -54,12 +68,19 @@ export async function updateOwnProfile(
     data: {
       ...(input.name ? { name: input.name } : {}),
       ...(input.phone !== undefined ? { phone: input.phone } : {}),
-      ...(input.newPassword ? { password: await bcrypt.hash(input.newPassword, 10) } : {}),
+      // A password change logs out every other session.
+      ...(input.newPassword
+        ? { password: await bcrypt.hash(input.newPassword, 10), tokenVersion: { increment: 1 } }
+        : {}),
     },
     include: { role: true },
   });
 
-  return withPermissions(toSafeUser(updated));
+  return {
+    user: await withPermissions(toSafeUser(updated)),
+    // New token for the session that made the change, so it stays logged in.
+    token: input.newPassword ? signSessionToken(updated) : null,
+  };
 }
 
 export async function getCurrentUser(userId: number) {

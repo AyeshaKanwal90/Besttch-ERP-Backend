@@ -69,6 +69,11 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
   }
 
   const input = parseOrThrow(updateProfileSchema, req.body);
-  const user = await authService.updateOwnProfile(req.user.id, input);
+  const { user, token } = await authService.updateOwnProfile(req.user.id, input);
+
+  if (token) {
+    res.cookie(env.cookieName, token, cookieOptions);
+  }
+
   success(res, user, "Profile updated successfully");
 });

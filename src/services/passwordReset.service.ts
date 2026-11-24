@@ -102,7 +102,8 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
     await tx.user.update({
       where: { id: record.userId },
-      data: { password: passwordHash },
+      // Ends every existing session for the account.
+      data: { password: passwordHash, tokenVersion: { increment: 1 } },
     });
 
     // Any other outstanding links for this user stop working too.

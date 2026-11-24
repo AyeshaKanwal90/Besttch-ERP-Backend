@@ -157,6 +157,8 @@ describe("POST /api/auth/reset-password", () => {
     const { where, data } = db.user.update.mock.calls[0][0];
     expect(where).toEqual({ id: 5 });
     expect(await bcrypt.compare("NewPassword1", data.password)).toBe(true);
+    // Every existing session for the account is ended.
+    expect(data.tokenVersion).toEqual({ increment: 1 });
   });
 
   it.each([

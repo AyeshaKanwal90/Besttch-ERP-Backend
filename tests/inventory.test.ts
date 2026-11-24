@@ -21,6 +21,9 @@ jest.mock("../src/config/prisma", () => {
     rolePermission: {
       findMany: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
     warehouse: {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
@@ -45,6 +48,7 @@ import {
   FAKE_CLIENT,
   FAKE_STAFF,
   FAKE_SUPER_ADMIN,
+  useValidSessions,
 } from "./helpers/authToken";
 import { useDefaultPermissions } from "./helpers/permissions";
 
@@ -55,6 +59,7 @@ const db = prisma as unknown as {
   item: Record<string, jest.Mock>;
   warehouse: Record<string, jest.Mock>;
   rolePermission: Record<string, jest.Mock>;
+  user: Record<string, jest.Mock>;
 };
 
 const ACTIVE_WAREHOUSE = { id: 2, name: "Second", code: "SEC", isActive: true };
@@ -86,6 +91,7 @@ beforeEach(() => {
     Object.values(model).forEach((fn) => fn.mockReset());
   }
   useDefaultPermissions(db.rolePermission.findMany);
+  useValidSessions(db.user.findUnique);
 });
 
 describe("inventory access by role", () => {

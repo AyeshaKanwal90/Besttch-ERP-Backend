@@ -4,6 +4,7 @@ import request from "supertest";
 jest.mock("../src/config/prisma", () => ({
   prisma: {
     user: {
+      findUnique: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
     },
@@ -16,7 +17,7 @@ jest.mock("../src/config/prisma", () => ({
 import { prisma } from "../src/config/prisma";
 import { createApp } from "../src/app";
 import { PERMISSION_NAMES } from "../src/constants/permissions";
-import { FAKE_CLIENT, FAKE_STAFF, makeAuthCookie } from "./helpers/authToken";
+import { FAKE_CLIENT, FAKE_STAFF, makeAuthCookie, useValidSessions } from "./helpers/authToken";
 import { useDefaultPermissions } from "./helpers/permissions";
 
 const app = createApp();
@@ -102,6 +103,7 @@ describe("GET /api/auth/me", () => {
   beforeEach(() => {
     findFirst.mockReset();
     useDefaultPermissions(prisma.rolePermission.findMany as jest.Mock);
+    useValidSessions(prisma.user.findUnique as jest.Mock);
   });
 
   it("includes the staff role's permissions", async () => {
