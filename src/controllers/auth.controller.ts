@@ -2,7 +2,13 @@ import { Request, Response } from "express";
 import { env } from "../config/env";
 import { asyncHandler } from "../utils/asyncHandler";
 import { success } from "../utils/apiResponse";
-import { loginSchema, updateProfileSchema } from "../validators/auth.validator";
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  resetPasswordSchema,
+  updateProfileSchema,
+} from "../validators/auth.validator";
+import * as passwordResetService from "../services/passwordReset.service";
 import { parseOrThrow } from "../validators/validate";
 import * as authService from "../services/auth.service";
 import { ApiError } from "../utils/ApiError";
@@ -40,6 +46,21 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
 
   const user = await authService.getCurrentUser(req.user.id);
   success(res, user);
+});
+
+export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { email } = parseOrThrow(forgotPasswordSchema, req.body);
+  await passwordResetService.requestPasswordReset(email);
+
+  // Same answer whether or not the account exists.
+  success(res, null, "If an account exists for that email, a password reset link has been sent.");
+});
+
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { token, password } = parseOrThrow(resetPasswordSchema, req.body);
+  await passwordResetService.resetPassword(token, password);
+
+  success(res, null, "Your password has been reset. You can now log in.");
 });
 
 export const updateProfile = asyncHandler(async (req: Request, res: Response) => {

@@ -1,7 +1,11 @@
 import { Router } from "express";
 import * as authController from "../controllers/auth.controller";
 import { requireAuth } from "../middleware/auth";
-import { loginRateLimiter } from "../middleware/rateLimit";
+import {
+  forgotPasswordRateLimiter,
+  loginRateLimiter,
+  resetPasswordRateLimiter,
+} from "../middleware/rateLimit";
 
 const router = Router();
 
@@ -60,6 +64,83 @@ router.post("/login", loginRateLimiter, authController.login);
  *         description: Internal server error
  */
 router.post("/logout", authController.logout);
+
+/**
+ * @openapi
+ * /auth/forgot-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Request a password reset link
+ *     description: >
+ *       Emails a single-use reset link valid for 1 hour
+ *       ($APP_URL/reset-password?token=...). Always returns 200 with the
+ *       same message so it can't reveal which emails are registered.
+ *       Requesting a new link invalidates earlier ones. Without SMTP
+ *       configured, the email is printed to the server console.
+ *       Rate limited to 5 requests per 15 minutes per IP.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: admin@besttech.com
+ *     responses:
+ *       200:
+ *         description: Request accepted (whether or not the account exists)
+ *       422:
+ *         description: Not a valid email address
+ *       429:
+ *         description: Too many requests
+ */
+router.post("/forgot-password", forgotPasswordRateLimiter, authController.forgotPassword);
+
+/**
+ * @openapi
+ * /auth/reset-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Set a new password with a reset token
+ *     description: >
+ *       Uses the token from the reset email. Each token works once and
+ *       expires after 1 hour; using it also invalidates any other
+ *       outstanding links for the account. Rate limited to 10 attempts
+ *       per 15 minutes per IP.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - password
+ *             properties:
+ *               token:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 8
+ *     responses:
+ *       200:
+ *         description: Password changed
+ *       400:
+ *         description: Token invalid, expired or already used
+ *       422:
+ *         description: Validation failed (e.g. password too short)
+ *       429:
+ *         description: Too many attempts
+ */
+router.post("/reset-password", resetPasswordRateLimiter, authController.resetPassword);
 
 /**
  * @openapi

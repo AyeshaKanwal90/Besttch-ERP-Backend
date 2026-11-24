@@ -20,3 +20,12 @@ export const updateProfileSchema = z
   });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().email("A valid email is required"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(1, "Reset token is required").max(200),
+  password: z.string().min(8, "Password must be at least 8 characters").max(200),
+});
