@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
+import { idParam } from "../utils/params";
 import { paginated, success } from "../utils/apiResponse";
 import { ApiError } from "../utils/ApiError";
 import {
@@ -26,7 +27,7 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getOne = asyncHandler(async (req: Request, res: Response) => {
-  const user = await usersService.getUserById(Number(req.params.id));
+  const user = await usersService.getUserById(idParam(req));
   success(res, user);
 });
 
@@ -39,19 +40,19 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
 export const update = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const input = parseOrThrow(updateUserSchema, req.body);
-  const user = await usersService.updateUser(Number(req.params.id), input, req.user);
+  const user = await usersService.updateUser(idParam(req), input, req.user);
   success(res, user, "User updated successfully");
 });
 
 export const remove = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
-  await usersService.deleteUser(Number(req.params.id), req.user);
+  await usersService.deleteUser(idParam(req), req.user);
   res.status(204).send();
 });
 
 export const setStatus = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const { status } = parseOrThrow(toggleStatusSchema, req.body);
-  const user = await usersService.setUserStatus(Number(req.params.id), status, req.user);
+  const user = await usersService.setUserStatus(idParam(req), status, req.user);
   success(res, user, "User status updated");
 });

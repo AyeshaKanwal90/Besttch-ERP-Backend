@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 
 import { asyncHandler } from "../utils/asyncHandler";
+import { idParam } from "../utils/params";
 import { paginated, success } from "../utils/apiResponse";
 
 import { ApiError } from "../utils/ApiError";
@@ -27,7 +28,7 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getOne = asyncHandler(async (req: Request, res: Response) => {
-  const product = await productsService.getProductById(Number(req.params.id));
+  const product = await productsService.getProductById(idParam(req));
 
   success(res, product);
 });
@@ -60,7 +61,7 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
   const input = parseOrThrow(updateProductSchema, req.body);
 
   const product = await productsService.updateProduct(
-    Number(req.params.id),
+    idParam(req),
     input
   );
 
@@ -72,7 +73,7 @@ export const remove = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.unauthorized();
   }
 
-  await productsService.deleteProduct(Number(req.params.id), req.user);
+  await productsService.deleteProduct(idParam(req), req.user);
 
   res.status(204).send();
 });

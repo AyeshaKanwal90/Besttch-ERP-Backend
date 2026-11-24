@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 
 import { asyncHandler } from "../utils/asyncHandler";
+import { idParam } from "../utils/params";
 
 import { paginated, success } from "../utils/apiResponse";
 
@@ -41,7 +42,7 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
  */
 export const getOne = asyncHandler(async (req: Request, res: Response) => {
   const warehouse = await warehousesService.getWarehouseById(
-    Number(req.params.id)
+    idParam(req)
   );
 
   success(res, warehouse);
@@ -74,7 +75,7 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
   const input = parseOrThrow(updateWarehouseSchema, req.body);
 
   const warehouse = await warehousesService.updateWarehouse(
-    Number(req.params.id),
+    idParam(req),
     input
   );
 
@@ -90,7 +91,7 @@ export const remove = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const warehouse = await warehousesService.deleteWarehouse(
-    Number(req.params.id),
+    idParam(req),
     req.user
   );
 

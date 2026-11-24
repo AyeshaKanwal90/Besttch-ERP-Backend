@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 
 import { asyncHandler } from "../utils/asyncHandler";
+import { idParam } from "../utils/params";
 
 import { paginated, success } from "../utils/apiResponse";
 
@@ -37,7 +38,7 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getOne = asyncHandler(async (req: Request, res: Response) => {
-  const item = await itemsService.getItemById(Number(req.params.id));
+  const item = await itemsService.getItemById(idParam(req));
 
   success(res, item);
 });
@@ -57,25 +58,25 @@ export const getByCode = asyncHandler(async (req: Request, res: Response) => {
 export const update = asyncHandler(async (req: Request, res: Response) => {
   const input = parseOrThrow(updateItemSchema, req.body);
 
-  const item = await itemsService.updateItem(Number(req.params.id), input);
+  const item = await itemsService.updateItem(idParam(req), input);
 
   success(res, item, "Item updated successfully");
 });
 
 export const sell = asyncHandler(async (req: Request, res: Response) => {
-  const item = await itemsService.sellItem(Number(req.params.id));
+  const item = await itemsService.sellItem(idParam(req));
 
   success(res, item, "Item sold successfully");
 });
 
 export const remove = asyncHandler(async (req: Request, res: Response) => {
-  const item = await itemsService.removeItem(Number(req.params.id));
+  const item = await itemsService.removeItem(idParam(req));
 
   success(res, item, "Item removed from inventory");
 });
 
 export const returnItem = asyncHandler(async (req: Request, res: Response) => {
-  const item = await itemsService.returnItem(Number(req.params.id));
+  const item = await itemsService.returnItem(idParam(req));
 
   success(res, item, "Item returned to inventory");
 });
