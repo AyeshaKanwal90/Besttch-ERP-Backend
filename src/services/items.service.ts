@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "../config/prisma";
 import { ApiError } from "../utils/ApiError";
+import { ROLES } from "../constants/roles";
+import { AuthUser } from "../types/express";
 
 interface CreateItemInput {
   barcode: string;
@@ -403,7 +405,11 @@ export async function getItemByCode(itemCode: string) {
  * - price
  * - warehouse
  */
-export async function updateItem(id: number, input: UpdateItemInput) {
+export async function updateItem(
+  id: number,
+  input: UpdateItemInput,
+  actingUser: AuthUser
+) {
   const item = await prisma.item.findUnique({
     where: {
       id,
@@ -412,6 +418,19 @@ export async function updateItem(id: number, input: UpdateItemInput) {
 
   if (!item) {
     throw ApiError.notFound("Item not found");
+  }
+
+  /*
+   * Staff can move items and fix names/serials but pricing
+   * is a manager decision. Re-sending the current price is
+   * fine so edit forms that post every field still work.
+   */
+  if (
+    actingUser.roleName === ROLES.STAFF &&
+    input.price !== undefined &&
+    !item.price.equals(new Prisma.Decimal(input.price))
+  ) {
+    throw ApiError.forbidden("Staff cannot change item prices");
   }
 
   /*

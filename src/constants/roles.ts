@@ -11,3 +11,7 @@ export const INTERNAL_ROLES = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.STAFF] as c
 
 // Only these roles may manage the users module.
 export const USER_MANAGER_ROLES = [ROLES.SUPER_ADMIN, ROLES.ADMIN] as const;
+
+// Roles that may create, edit and delete products and warehouses.
+// Staff can still view them and work with individual items.
+export const INVENTORY_MANAGER_ROLES = [ROLES.SUPER_ADMIN, ROLES.ADMIN] as const;

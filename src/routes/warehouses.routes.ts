@@ -2,7 +2,8 @@ import { Router } from "express";
 
 import * as warehousesController from "../controllers/warehouses.controller";
 
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireRole } from "../middleware/auth";
+import { INTERNAL_ROLES, INVENTORY_MANAGER_ROLES } from "../constants/roles";
 
 const router = Router();
 
@@ -13,7 +14,7 @@ const router = Router();
  *     tags:
  *       - Warehouses
  *     summary: Get all warehouses
- *     description: Search warehouses by name, code, address or warehouse ID.
+ *     description: Search warehouses by name, code, address or warehouse ID. Available to super admin, admin and staff.
  *
  *     parameters:
  *       - in: query
@@ -43,7 +44,7 @@ const router = Router();
  *       200:
  *         description: Warehouses retrieved successfully
  */
-router.get("/", requireAuth, warehousesController.list);
+router.get("/", requireAuth, requireRole(...INTERNAL_ROLES), warehousesController.list);
 
 /**
  * @openapi
@@ -52,6 +53,7 @@ router.get("/", requireAuth, warehousesController.list);
  *     tags:
  *       - Warehouses
  *     summary: Create a warehouse
+ *     description: Super admin and admin only.
  *
  *     requestBody:
  *       required: true
@@ -86,10 +88,13 @@ router.get("/", requireAuth, warehousesController.list);
  *       201:
  *         description: Warehouse created successfully
  *
+ *       403:
+ *         description: Only super admin or admin can create warehouses
+ *
  *       422:
  *         description: Validation failed
  */
-router.post("/", requireAuth, warehousesController.create);
+router.post("/", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), warehousesController.create);
 
 /**
  * @openapi
@@ -114,7 +119,7 @@ router.post("/", requireAuth, warehousesController.create);
  *       404:
  *         description: Warehouse not found
  */
-router.get("/code/:code", requireAuth, warehousesController.getByCode);
+router.get("/code/:code", requireAuth, requireRole(...INTERNAL_ROLES), warehousesController.getByCode);
 
 /**
  * @openapi
@@ -139,7 +144,7 @@ router.get("/code/:code", requireAuth, warehousesController.getByCode);
  *       404:
  *         description: Warehouse not found
  */
-router.get("/:id", requireAuth, warehousesController.getOne);
+router.get("/:id", requireAuth, requireRole(...INTERNAL_ROLES), warehousesController.getOne);
 
 /**
  * @openapi
@@ -148,6 +153,7 @@ router.get("/:id", requireAuth, warehousesController.getOne);
  *     tags:
  *       - Warehouses
  *     summary: Update a warehouse
+ *     description: Super admin and admin only.
  *
  *     parameters:
  *       - in: path
@@ -185,13 +191,16 @@ router.get("/:id", requireAuth, warehousesController.getOne);
  *       200:
  *         description: Warehouse updated successfully
  *
+ *       403:
+ *         description: Only super admin or admin can update warehouses
+ *
  *       404:
  *         description: Warehouse not found
  *
  *       422:
  *         description: Validation failed
  */
-router.put("/:id", requireAuth, warehousesController.update);
+router.put("/:id", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), warehousesController.update);
 
 /**
  * @openapi
@@ -202,7 +211,7 @@ router.put("/:id", requireAuth, warehousesController.update);
  *     summary: Delete a warehouse
  *     description: >
  *       Deactivates the warehouse instead of physically deleting it.
- *       Only managers and admins can perform this action.
+ *       Super admin and admin only.
  *       A warehouse cannot be deactivated while it contains in-stock items.
  *
  *     parameters:
@@ -217,7 +226,7 @@ router.put("/:id", requireAuth, warehousesController.update);
  *         description: Warehouse deactivated successfully
  *
  *       403:
- *         description: Only manager or admin can delete warehouse
+ *         description: Only super admin or admin can delete warehouses
  *
  *       404:
  *         description: Warehouse not found
@@ -225,6 +234,6 @@ router.put("/:id", requireAuth, warehousesController.update);
  *       422:
  *         description: Warehouse still contains stock
  */
-router.delete("/:id", requireAuth, warehousesController.remove);
+router.delete("/:id", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), warehousesController.remove);
 
 export default router;

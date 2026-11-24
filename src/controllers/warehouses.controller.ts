@@ -5,8 +5,6 @@ import { idParam } from "../utils/params";
 
 import { paginated, success } from "../utils/apiResponse";
 
-import { ApiError } from "../utils/ApiError";
-
 import {
   createWarehouseSchema,
   updateWarehouseSchema,
@@ -86,14 +84,7 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
  * DELETE / DEACTIVATE
  */
 export const remove = asyncHandler(async (req: Request, res: Response) => {
-  if (!req.user) {
-    throw ApiError.unauthorized();
-  }
-
-  const warehouse = await warehousesService.deleteWarehouse(
-    idParam(req),
-    req.user
-  );
+  const warehouse = await warehousesService.deleteWarehouse(idParam(req));
 
   success(res, warehouse, "Warehouse deactivated successfully");
 });

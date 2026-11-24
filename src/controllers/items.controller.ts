@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 
 import { asyncHandler } from "../utils/asyncHandler";
 import { idParam } from "../utils/params";
+import { ApiError } from "../utils/ApiError";
 
 import { paginated, success } from "../utils/apiResponse";
 
@@ -58,7 +59,11 @@ export const getByCode = asyncHandler(async (req: Request, res: Response) => {
 export const update = asyncHandler(async (req: Request, res: Response) => {
   const input = parseOrThrow(updateItemSchema, req.body);
 
-  const item = await itemsService.updateItem(idParam(req), input);
+  if (!req.user) {
+    throw ApiError.unauthorized();
+  }
+
+  const item = await itemsService.updateItem(idParam(req), input, req.user);
 
   success(res, item, "Item updated successfully");
 });

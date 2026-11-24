@@ -1,7 +1,8 @@
 import { Router } from "express";
 
 import * as productsController from "../controllers/products.controller";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireRole } from "../middleware/auth";
+import { INTERNAL_ROLES, INVENTORY_MANAGER_ROLES } from "../constants/roles";
 
 const router = Router();
 
@@ -12,7 +13,7 @@ const router = Router();
  *     tags:
  *       - Products
  *     summary: Get all products
- *     description: Returns all products with quantity calculated from in-stock items. Supports search by product name, SKU, barcode or product ID.
+ *     description: Returns all products with quantity calculated from in-stock items. Supports search by product name, SKU, barcode or product ID. Available to super admin, admin and staff.
  *     parameters:
  *       - in: query
  *         name: search
@@ -34,7 +35,7 @@ const router = Router();
  *       200:
  *         description: Products retrieved successfully
  */
-router.get("/", requireAuth, productsController.list);
+router.get("/", requireAuth, requireRole(...INTERNAL_ROLES), productsController.list);
 
 /**
  * @openapi
@@ -43,6 +44,7 @@ router.get("/", requireAuth, productsController.list);
  *     tags:
  *       - Products
  *     summary: Create a product
+ *     description: Super admin and admin only.
  *     requestBody:
  *       required: true
  *       content:
@@ -76,10 +78,12 @@ router.get("/", requireAuth, productsController.list);
  *     responses:
  *       201:
  *         description: Product created successfully
+ *       403:
+ *         description: Only super admin or admin can create products
  *       422:
  *         description: Validation failed
  */
-router.post("/", requireAuth, productsController.create);
+router.post("/", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), productsController.create);
 
 /**
  * @openapi
@@ -101,7 +105,7 @@ router.post("/", requireAuth, productsController.create);
  *       404:
  *         description: Product not found
  */
-router.get("/barcode/:barcode", requireAuth, productsController.getByBarcode);
+router.get("/barcode/:barcode", requireAuth, requireRole(...INTERNAL_ROLES), productsController.getByBarcode);
 
 /**
  * @openapi
@@ -123,7 +127,7 @@ router.get("/barcode/:barcode", requireAuth, productsController.getByBarcode);
  *       404:
  *         description: Product not found
  */
-router.get("/sku/:sku", requireAuth, productsController.getBySku);
+router.get("/sku/:sku", requireAuth, requireRole(...INTERNAL_ROLES), productsController.getBySku);
 
 /**
  * @openapi
@@ -145,7 +149,7 @@ router.get("/sku/:sku", requireAuth, productsController.getBySku);
  *       404:
  *         description: Product not found
  */
-router.get("/:id", requireAuth, productsController.getOne);
+router.get("/:id", requireAuth, requireRole(...INTERNAL_ROLES), productsController.getOne);
 
 /**
  * @openapi
@@ -154,6 +158,7 @@ router.get("/:id", requireAuth, productsController.getOne);
  *     tags:
  *       - Products
  *     summary: Update a product
+ *     description: Super admin and admin only.
  *     parameters:
  *       - in: path
  *         name: id
@@ -188,12 +193,14 @@ router.get("/:id", requireAuth, productsController.getOne);
  *     responses:
  *       200:
  *         description: Product updated successfully
+ *       403:
+ *         description: Only super admin or admin can update products
  *       404:
  *         description: Product not found
  *       422:
  *         description: Validation failed
  */
-router.put("/:id", requireAuth, productsController.update);
+router.put("/:id", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), productsController.update);
 
 /**
  * @openapi
@@ -202,7 +209,7 @@ router.put("/:id", requireAuth, productsController.update);
  *     tags:
  *       - Products
  *     summary: Delete a product
- *     description: Soft deletes the product. Only manager and admin users can delete a product. Product cannot be deleted while items are still in stock.
+ *     description: Soft deletes the product. Super admin and admin only. Product cannot be deleted while items are still in stock.
  *     parameters:
  *       - in: path
  *         name: id
@@ -213,12 +220,12 @@ router.put("/:id", requireAuth, productsController.update);
  *       204:
  *         description: Product deleted successfully
  *       403:
- *         description: Only manager or admin can delete the product
+ *         description: Only super admin or admin can delete products
  *       404:
  *         description: Product not found
  *       422:
  *         description: Product still has items in stock
  */
-router.delete("/:id", requireAuth, productsController.remove);
+router.delete("/:id", requireAuth, requireRole(...INVENTORY_MANAGER_ROLES), productsController.remove);
 
 export default router;

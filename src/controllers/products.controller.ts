@@ -4,8 +4,6 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { idParam } from "../utils/params";
 import { paginated, success } from "../utils/apiResponse";
 
-import { ApiError } from "../utils/ApiError";
-
 import {
   createProductSchema,
   listProductsQuerySchema,
@@ -69,11 +67,7 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const remove = asyncHandler(async (req: Request, res: Response) => {
-  if (!req.user) {
-    throw ApiError.unauthorized();
-  }
-
-  await productsService.deleteProduct(idParam(req), req.user);
+  await productsService.deleteProduct(idParam(req));
 
   res.status(204).send();
 });

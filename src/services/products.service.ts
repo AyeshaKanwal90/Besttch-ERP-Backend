@@ -1,7 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { ApiError } from "../utils/ApiError";
-import { AuthUser } from "../types/express";
 
 interface ListProductsParams {
   search?: string;
@@ -247,12 +246,8 @@ export async function updateProduct(id: number, input: UpdateProductInput) {
   return formatProduct(product);
 }
 
-export async function deleteProduct(id: number, actingUser: AuthUser) {
-  // Strictly manager/admin as requested.
-  if (!["manager", "admin"].includes(actingUser.roleName)) {
-    throw ApiError.forbidden("Only managers and admins can delete products");
-  }
-
+// Role check lives on the route (INVENTORY_MANAGER_ROLES).
+export async function deleteProduct(id: number) {
   const product = await prisma.product.findFirst({
     where: {
       id,

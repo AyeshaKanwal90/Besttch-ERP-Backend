@@ -2,7 +2,6 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "../config/prisma";
 import { ApiError } from "../utils/ApiError";
-import { AuthUser } from "../types/express";
 
 interface ListWarehousesParams {
   search?: string;
@@ -264,13 +263,9 @@ export async function updateWarehouse(id: number, input: UpdateWarehouseInput) {
  *
  * We don't physically delete the warehouse.
  *
- * Only manager/admin can do this.
+ * Role check lives on the route (INVENTORY_MANAGER_ROLES).
  */
-export async function deleteWarehouse(id: number, actingUser: AuthUser) {
-  if (!["manager", "admin"].includes(actingUser.roleName)) {
-    throw ApiError.forbidden("Only managers and admins can delete warehouses");
-  }
-
+export async function deleteWarehouse(id: number) {
   const warehouse = await prisma.warehouse.findUnique({
     where: {
       id,
