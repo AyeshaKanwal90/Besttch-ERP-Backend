@@ -30,6 +30,19 @@ enum MovementReason {
   correction
 }
 
+enum AdjustmentType {
+  receive
+  damage
+  return
+  correction
+}
+
+enum AdjustmentStatus {
+  pending
+  approved
+  rejected
+}
+
 enum ItemStatus {
   in_stock
   sold
@@ -73,24 +86,26 @@ model RolePermission {
 }
 
 model User {
-  id          Int        @id @default(autoincrement())
-  name        String     @db.VarChar(150)
-  email       String     @unique @db.VarChar(191)
-  password    String     @db.VarChar(255)
-  roleId      Int        @map("role_id")
-  role        Role       @relation(fields: [roleId], references: [id])
-  phone       String?    @db.VarChar(30)
-  avatarUrl   String?    @map("avatar_url") @db.VarChar(255)
-  status      UserStatus @default(active)
+  id           Int        @id @default(autoincrement())
+  name         String     @db.VarChar(150)
+  email        String     @unique @db.VarChar(191)
+  password     String     @db.VarChar(255)
+  roleId       Int        @map("role_id")
+  role         Role       @relation(fields: [roleId], references: [id])
+  phone        String?    @db.VarChar(30)
+  avatarUrl    String?    @map("avatar_url") @db.VarChar(255)
+  status       UserStatus @default(active)
   // Embedded in every JWT. Bumping it logs out all of the user's sessions.
-  tokenVersion Int       @default(0) @map("token_version")
-  lastLoginAt DateTime?  @map("last_login_at")
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
-  deletedAt   DateTime?  @map("deleted_at")
+  tokenVersion Int        @default(0) @map("token_version")
+  lastLoginAt  DateTime?  @map("last_login_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  deletedAt    DateTime?  @map("deleted_at")
 
-  stockMovements      StockMovement[]       @relation("MovementUser")
-  passwordResetTokens PasswordResetToken[]
+  stockMovements       StockMovement[]      @relation("MovementUser")
+  requestedAdjustments StockAdjustment[]    @relation("AdjustmentRequestedBy")
+  reviewedAdjustments  StockAdjustment[]    @relation("AdjustmentReviewedBy")
+  passwordResetTokens  PasswordResetToken[]
 
   @@index([roleId])
   @@index([status])
@@ -122,10 +137,11 @@ model Warehouse {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  stockMovements         StockMovement[] @relation("MovementWarehouse")
-  outgoingTransfers      StockMovement[] @relation("MovementFromWarehouse")
-  incomingTransfers      StockMovement[] @relation("MovementToWarehouse")
-  items                  Item[]
+  stockMovements    StockMovement[]       @relation("MovementWarehouse")
+  outgoingTransfers StockMovement[]       @relation("MovementFromWarehouse")
+  incomingTransfers StockMovement[]       @relation("MovementToWarehouse")
+  items             Item[]
+  adjustmentLines   StockAdjustmentLine[]
 
   @@map("warehouses")
 }
@@ -170,9 +186,10 @@ model Product {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  category       Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  stockMovements StockMovement[]
-  items          Item[]
+  category        Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  stockMovements  StockMovement[]
+  items           Item[]
+  adjustmentLines StockAdjustmentLine[]
 
   @@index([barcode])
   @@index([categoryId])
@@ -223,6 +240,8 @@ model StockMovement {
   fromWarehouseId Int?           @map("from_warehouse_id")
   toWarehouseId   Int?           @map("to_warehouse_id")
   itemId          Int?           @map("item_id")
+  // Set when the movement came from an approved stock adjustment.
+  adjustmentId    Int?           @map("adjustment_id")
   // Null for movements recorded by the system (e.g. opening balances).
   userId          Int?           @map("user_id")
   type            MovementType
@@ -232,18 +251,68 @@ model StockMovement {
   note            String?        @db.Text
   createdAt       DateTime       @default(now()) @map("created_at")
 
-  product       Product    @relation(fields: [productId], references: [id])
-  warehouse     Warehouse  @relation("MovementWarehouse", fields: [warehouseId], references: [id])
-  fromWarehouse Warehouse? @relation("MovementFromWarehouse", fields: [fromWarehouseId], references: [id], onDelete: Restrict)
-  toWarehouse   Warehouse? @relation("MovementToWarehouse", fields: [toWarehouseId], references: [id], onDelete: Restrict)
-  item          Item?      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  product       Product          @relation(fields: [productId], references: [id])
+  warehouse     Warehouse        @relation("MovementWarehouse", fields: [warehouseId], references: [id])
+  fromWarehouse Warehouse?       @relation("MovementFromWarehouse", fields: [fromWarehouseId], references: [id], onDelete: Restrict)
+  toWarehouse   Warehouse?       @relation("MovementToWarehouse", fields: [toWarehouseId], references: [id], onDelete: Restrict)
+  item          Item?            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  adjustment    StockAdjustment? @relation(fields: [adjustmentId], references: [id], onDelete: Restrict)
   // Restrict: who made a stock change must never be lost.
-  user          User?      @relation("MovementUser", fields: [userId], references: [id], onDelete: Restrict)
+  user          User?            @relation("MovementUser", fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([productId, createdAt])
   @@index([warehouseId])
   @@index([itemId])
   @@index([userId])
   @@index([createdAt])
+  @@index([adjustmentId])
   @@map("stock_movements")
+}
+
+// A request to change stock in bulk. Staff submit them as pending; an
+// approver applies them. Applying writes the item changes and the stock
+// movements in one transaction.
+model StockAdjustment {
+  id            Int              @id @default(autoincrement())
+  type          AdjustmentType
+  status        AdjustmentStatus @default(pending)
+  reason        String           @db.VarChar(200)
+  note          String?          @db.Text
+  requestedById Int              @map("requested_by_id")
+  reviewedById  Int?             @map("reviewed_by_id")
+  reviewedAt    DateTime?        @map("reviewed_at")
+  rejectReason  String?          @map("reject_reason") @db.Text
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  requestedBy User                  @relation("AdjustmentRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy  User?                 @relation("AdjustmentReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  lines       StockAdjustmentLine[]
+  movements   StockMovement[]
+
+  @@index([status, createdAt])
+  @@index([requestedById])
+  @@map("stock_adjustments")
+}
+
+model StockAdjustmentLine {
+  id           Int      @id @default(autoincrement())
+  adjustmentId Int      @map("adjustment_id")
+  productId    Int      @map("product_id")
+  warehouseId  Int      @map("warehouse_id")
+  // Units affected. Positive, except for corrections where a negative
+  // number removes stock.
+  quantity     Int
+  // Optional serial numbers: new items' serials when receiving, or the
+  // exact items to damage / return / remove.
+  serials      String[] @default([])
+  // Price for received items; defaults to the product's unit price.
+  unitPrice    Decimal? @map("unit_price") @db.Decimal(12, 2)
+
+  adjustment StockAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse  Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@index([adjustmentId])
+  @@map("stock_adjustment_lines")
 }

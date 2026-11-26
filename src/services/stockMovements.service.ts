@@ -21,6 +21,7 @@ export interface MovementInput {
   toWarehouseId?: number | null;
   reference?: string | null;
   note?: string | null;
+  adjustmentId?: number | null;
 }
 
 export async function recordMovements(tx: Prisma.TransactionClient, movements: MovementInput[]) {
@@ -38,6 +39,7 @@ export async function recordMovements(tx: Prisma.TransactionClient, movements: M
       toWarehouseId: m.toWarehouseId ?? null,
       reference: m.reference ?? null,
       note: m.note ?? null,
+      adjustmentId: m.adjustmentId ?? null,
     })),
   });
 }
@@ -56,6 +58,7 @@ export const movementSelect = {
   toWarehouse: { select: { id: true, name: true, code: true } },
   item: { select: { id: true, itemCode: true, serialNumber: true } },
   user: { select: { id: true, name: true } },
+  adjustmentId: true,
 } satisfies Prisma.StockMovementSelect;
 
 export interface ListMovementsParams {

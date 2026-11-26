@@ -66,6 +66,10 @@ const swaggerOptions: swaggerJsdoc.Options = {
         description: "Append-only history of every stock change",
       },
       {
+        name: "Stock Adjustments",
+        description: "Bulk receive, damage, return and correction requests with approval",
+      },
+      {
         name: "Health",
         description: "Server health",
       },
