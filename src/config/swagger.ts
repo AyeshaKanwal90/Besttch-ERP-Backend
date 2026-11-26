@@ -58,6 +58,10 @@ const swaggerOptions: swaggerJsdoc.Options = {
         description: "Warehouse management",
       },
       {
+        name: "Categories",
+        description: "Product categories",
+      },
+      {
         name: "Health",
         description: "Server health",
       },

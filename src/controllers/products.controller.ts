@@ -12,12 +12,25 @@ import {
 
 import { parseOrThrow } from "../validators/validate";
 import * as productsService from "../services/products.service";
+import { hasPermission } from "../services/permissions.service";
+import { ApiError } from "../utils/ApiError";
+
+// Reorder thresholds are managed separately from other product fields
+// (low_stock.manage in the permissions matrix).
+async function assertCanSetReorderLevel(req: Request, reorderLevel: number | undefined) {
+  if (reorderLevel === undefined) return;
+  if (!req.user || !(await hasPermission(req.user.roleName, "low_stock.manage"))) {
+    throw ApiError.forbidden("You do not have permission to change reorder levels");
+  }
+}
 
 export const list = asyncHandler(async (req: Request, res: Response) => {
   const query = parseOrThrow(listProductsQuerySchema, req.query);
 
   const { products, meta } = await productsService.listProducts({
     search: query.search,
+    categoryId: query.categoryId,
+    lowStock: query.lowStock,
     page: query.page,
     perPage: query.per_page,
   });
@@ -49,6 +62,7 @@ export const getBySku = asyncHandler(async (req: Request, res: Response) => {
 
 export const create = asyncHandler(async (req: Request, res: Response) => {
   const input = parseOrThrow(createProductSchema, req.body);
+  await assertCanSetReorderLevel(req, input.reorderLevel);
 
   const product = await productsService.createProduct(input);
 
@@ -57,6 +71,7 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
 
 export const update = asyncHandler(async (req: Request, res: Response) => {
   const input = parseOrThrow(updateProductSchema, req.body);
+  await assertCanSetReorderLevel(req, input.reorderLevel);
 
   const product = await productsService.updateProduct(
     idParam(req),

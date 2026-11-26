@@ -8,7 +8,8 @@ interface CreateItemInput {
   barcode: string;
   serialNumber?: string | null;
   itemName?: string | null;
-  price: number;
+  // Falls back to the product's unit price.
+  price?: number;
 
   warehouseId: number;
 
@@ -173,11 +174,8 @@ export async function createItem(
 
           unit: input.unit ?? "piece",
 
-          /*
-           * Reorder is not used by
-           * our current API.
-           */
-          reorderLevel: 0,
+          // The first item's price becomes the product's default.
+          unitPrice: new Prisma.Decimal(input.price ?? 0),
 
           isActive: true,
         },
@@ -208,7 +206,7 @@ export async function createItem(
 
         serialNumber: input.serialNumber ?? null,
 
-        price: new Prisma.Decimal(input?.price),
+        price: input.price !== undefined ? new Prisma.Decimal(input.price) : product.unitPrice,
 
         productId: product.id,
 

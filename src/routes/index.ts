@@ -6,6 +6,7 @@ import rolesRoutes from "./roles.routes";
 import dashboardRoutes from "./dashboard.routes";
 import productsRoutes from "./products.routes";
 import itemsRoutes from "./items.routes";
+import categoriesRoutes from "./categories.routes";
 const router = Router();
 
 router.use("/auth", authRoutes);
@@ -15,4 +16,5 @@ router.use("/dashboard", dashboardRoutes);
 router.use("/products", productsRoutes);
 router.use("/items", itemsRoutes);
 router.use("/warehouses", warehousesRoutes);
+router.use("/categories", categoriesRoutes);
 export default router;

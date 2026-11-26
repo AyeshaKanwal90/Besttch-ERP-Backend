@@ -110,11 +110,26 @@ model Warehouse {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  inventory      Inventory[]
   stockMovements StockMovement[]
   items          Item[]
 
   @@map("warehouses")
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  slug      String   @unique @db.VarChar(120)
+  parentId  Int?     @map("parent_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([parentId])
+  @@map("categories")
 }
 
 model Product {
@@ -125,8 +140,15 @@ model Product {
   description String? @db.Text
   unit        String  @db.VarChar(20)
 
-  // Kept for database compatibility.
-  // The current API does not use reorderLevel.
+  categoryId Int?    @map("category_id")
+  imageUrl   String? @map("image_url") @db.VarChar(500)
+
+  // Default price for new items when stock is received; each item can
+  // still carry its own price.
+  unitPrice Decimal @default(0) @map("unit_price") @db.Decimal(12, 2)
+
+  // Low-stock threshold: the product is "low" when its in-stock item
+  // count is at or below this. 0 turns the alert off.
   reorderLevel Int @default(0) @map("reorder_level")
 
   isActive  Boolean   @default(true) @map("is_active")
@@ -134,11 +156,12 @@ model Product {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  inventory      Inventory[]
+  category       Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   stockMovements StockMovement[]
   items          Item[]
 
   @@index([barcode])
+  @@index([categoryId])
   @@index([sku])
   @@map("products")
 }
@@ -171,21 +194,6 @@ model Item {
   @@index([status])
   @@index([serialNumber])
   @@map("items")
-}
-
-model Inventory {
-  id          Int      @id @default(autoincrement())
-  productId   Int      @map("product_id")
-  warehouseId Int      @map("warehouse_id")
-  quantity    Int      @default(0)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  product   Product   @relation(fields: [productId], references: [id])
-  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
-
-  @@unique([productId, warehouseId])
-  @@map("inventory")
 }
 
 // Append-only ledger: application code must never UPDATE or DELETE rows here.

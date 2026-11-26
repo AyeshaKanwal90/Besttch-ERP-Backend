@@ -1,9 +1,13 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { ApiError } from "../utils/ApiError";
+import { assertCategoryExists } from "./categories.service";
+import { getLowStockProductIds, isLowStock } from "./stockLevels";
 
 interface ListProductsParams {
   search?: string;
+  categoryId?: number;
+  lowStock?: boolean;
   page: number;
   perPage: number;
 }
@@ -15,6 +19,9 @@ interface ProductInput {
   description?: string | null;
   unit?: string;
   isActive?: boolean;
+  categoryId?: number | null;
+  unitPrice?: number;
+  reorderLevel?: number;
 }
 
 interface UpdateProductInput {
@@ -24,6 +31,9 @@ interface UpdateProductInput {
   description?: string | null;
   unit?: string;
   isActive?: boolean;
+  categoryId?: number | null;
+  unitPrice?: number;
+  reorderLevel?: number;
 }
 
 const productSelect = {
@@ -34,6 +44,11 @@ const productSelect = {
   description: true,
   unit: true,
   isActive: true,
+  categoryId: true,
+  category: { select: { id: true, name: true, slug: true } },
+  unitPrice: true,
+  reorderLevel: true,
+  imageUrl: true,
   createdAt: true,
   updatedAt: true,
 
@@ -48,12 +63,14 @@ const productSelect = {
   },
 } satisfies Prisma.ProductSelect;
 
-function formatProduct(product: any) {
+export function formatProduct(product: any) {
   const { _count, ...data } = product;
+  const quantity = _count?.items ?? 0;
 
   return {
     ...data,
-    quantity: _count?.items ?? 0,
+    quantity,
+    lowStock: isLowStock(quantity, data.reorderLevel ?? 0),
   };
 }
 
@@ -91,8 +108,14 @@ export async function listProducts(params: ListProductsParams) {
     }
   }
 
+  const lowStockIds = params.lowStock ? await getLowStockProductIds() : undefined;
+
   const where: Prisma.ProductWhereInput = {
     deletedAt: null,
+
+    ...(params.categoryId ? { categoryId: params.categoryId } : {}),
+
+    ...(lowStockIds ? { id: { in: lowStockIds } } : {}),
 
     ...(conditions.length
       ? {
@@ -178,6 +201,7 @@ export async function getProductBySku(sku: string) {
 export async function createProduct(input: ProductInput) {
   await assertSkuAvailable(input.sku);
   await assertBarcodeAvailable(input.barcode);
+  if (input.categoryId) await assertCategoryExists(input.categoryId);
 
   const product = await prisma.product.create({
     data: {
@@ -186,10 +210,9 @@ export async function createProduct(input: ProductInput) {
       name: input.name,
       description: input.description ?? null,
       unit: input.unit ?? "piece",
-
-      // Existing schema field; not used by API.
-      reorderLevel: 0,
-
+      categoryId: input.categoryId ?? null,
+      unitPrice: new Prisma.Decimal(input.unitPrice ?? 0),
+      reorderLevel: input.reorderLevel ?? 0,
       isActive: input.isActive ?? true,
     },
 
@@ -219,6 +242,8 @@ export async function updateProduct(id: number, input: UpdateProductInput) {
     await assertBarcodeAvailable(input.barcode, id);
   }
 
+  if (input.categoryId) await assertCategoryExists(input.categoryId);
+
   const product = await prisma.product.update({
     where: {
       id,
@@ -238,6 +263,12 @@ export async function updateProduct(id: number, input: UpdateProductInput) {
       ...(input.unit !== undefined ? { unit: input.unit } : {}),
 
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+
+      ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
+
+      ...(input.unitPrice !== undefined ? { unitPrice: new Prisma.Decimal(input.unitPrice) } : {}),
+
+      ...(input.reorderLevel !== undefined ? { reorderLevel: input.reorderLevel } : {}),
     },
 
     select: productSelect,

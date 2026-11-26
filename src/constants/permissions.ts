@@ -50,6 +50,7 @@ export const PERMISSIONS = [
   { name: "products.create", group: "Inventory", description: "Create products (including by scanning a new barcode)" },
   { name: "products.update", group: "Inventory", description: "Edit products" },
   { name: "products.delete", group: "Inventory", description: "Archive products" },
+  { name: "categories.manage", group: "Inventory", description: "Create, edit and delete product categories" },
   { name: "warehouses.view", group: "Inventory", description: "View warehouses" },
   { name: "warehouses.create", group: "Inventory", description: "Create warehouses" },
   { name: "warehouses.update", group: "Inventory", description: "Edit warehouses" },

@@ -22,10 +22,12 @@ export const createItemSchema = z.object({
     .optional()
     .nullable(),
 
+  // Defaults to the product's unit price when omitted.
   price: z.coerce
     .number()
     .finite("Price must be a valid number")
-    .min(0, "Price cannot be negative"),
+    .min(0, "Price cannot be negative")
+    .optional(),
 
   warehouseId: z.coerce.number().int().positive("Warehouse is required"),
 

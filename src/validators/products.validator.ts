@@ -12,6 +12,14 @@ export const createProductSchema = z.object({
   unit: z.string().trim().max(20).default("piece"),
 
   isActive: z.boolean().optional().default(true),
+
+  categoryId: z.coerce.number().int().positive().nullable().optional(),
+
+  // Default price for new items of this product.
+  unitPrice: z.coerce.number().finite().min(0, "Price cannot be negative").optional(),
+
+  // Low-stock threshold; 0 turns the alert off.
+  reorderLevel: z.coerce.number().int().min(0, "Reorder level cannot be negative").max(1_000_000).optional(),
 });
 
 export const updateProductSchema = z.object({
@@ -26,10 +34,23 @@ export const updateProductSchema = z.object({
   unit: z.string().trim().max(20).optional(),
 
   isActive: z.boolean().optional(),
+
+  categoryId: z.coerce.number().int().positive().nullable().optional(),
+
+  unitPrice: z.coerce.number().finite().min(0, "Price cannot be negative").optional(),
+
+  reorderLevel: z.coerce.number().int().min(0, "Reorder level cannot be negative").max(1_000_000).optional(),
 });
 
 export const listProductsQuerySchema = z.object({
   search: z.string().trim().optional(),
+
+  categoryId: z.coerce.number().int().positive().optional(),
+
+  lowStock: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((value) => value === "true"),
 
   page: z.coerce.number().int().min(1).default(1),
 
