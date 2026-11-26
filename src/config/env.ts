@@ -1,4 +1,5 @@
 import "dotenv/config";
+import path from "path";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -58,4 +59,11 @@ export const env = {
     pass: process.env.SMTP_PASS,
   },
   mailFrom: process.env.MAIL_FROM ?? "BestTech <no-reply@besttch.com>",
+
+  // Public URL of this API, used to build links to uploaded files.
+  publicApiUrl: (process.env.PUBLIC_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`).replace(/\/+$/, ""),
+
+  // Folder for uploaded files (served at /uploads). Relative to the
+  // working directory unless absolute.
+  uploadDir: path.resolve(process.env.UPLOAD_DIR ?? "uploads"),
 };

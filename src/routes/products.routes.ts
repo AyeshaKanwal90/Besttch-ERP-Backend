@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import * as productsController from "../controllers/products.controller";
 import { requireAuth, requirePermission } from "../middleware/auth";
+import { singleImageUpload } from "../middleware/upload";
 
 const router = Router();
 
@@ -226,5 +227,49 @@ router.put("/:id", requireAuth, requirePermission("products.update"), productsCo
  *         description: Product still has items in stock
  */
 router.delete("/:id", requireAuth, requirePermission("products.delete"), productsController.remove);
+
+/**
+ * @openapi
+ * /products/{id}/image:
+ *   post:
+ *     tags:
+ *       - Products
+ *     summary: Upload or replace the product image
+ *     description: >
+ *       Requires `products.update`. multipart/form-data with one file in
+ *       the "image" field: JPEG, PNG, WebP or GIF, at most 2 MB. The type
+ *       is checked from the file contents. Returns the product with its
+ *       new imageUrl; the previous image file is deleted.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [image]
+ *             properties:
+ *               image: { type: string, format: binary }
+ *     responses:
+ *       200:
+ *         description: Image uploaded
+ *       404:
+ *         description: Product not found
+ *       422:
+ *         description: Missing file, not an allowed image, or larger than 2 MB
+ *   delete:
+ *     tags:
+ *       - Products
+ *     summary: Remove the product image
+ *     description: Requires `products.update`.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: integer } }
+ *     responses:
+ *       200:
+ *         description: Image removed
+ */
+router.post("/:id/image", requireAuth, requirePermission("products.update"), singleImageUpload, productsController.uploadImage);
+router.delete("/:id/image", requireAuth, requirePermission("products.update"), productsController.removeImage);
 
 export default router;

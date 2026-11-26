@@ -2,6 +2,8 @@ import { NextFunction, Request, Response } from "express";
 import { Prisma } from "@prisma/client";
 import { ApiError } from "../utils/ApiError";
 import { failure } from "../utils/apiResponse";
+import multer from "multer";
+import { MAX_IMAGE_BYTES } from "./upload";
 
 export function notFoundHandler(req: Request, res: Response) {
   failure(res, 404, `Route not found: ${req.method} ${req.originalUrl}`);
@@ -31,6 +33,25 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   // mistake, not a server fault.
   if (typeof err === "object" && err !== null && (err as { type?: string }).type === "entity.parse.failed") {
     failure(res, 400, "Request body is not valid JSON");
+    return;
+  }
+
+  // Upload problems (file too large, unexpected field, too many files).
+  if (err instanceof multer.MulterError) {
+    const message =
+      err.code === "LIMIT_FILE_SIZE"
+        ? `Image must be ${MAX_IMAGE_BYTES / (1024 * 1024)} MB or smaller`
+        : err.code === "LIMIT_UNEXPECTED_FILE"
+          ? 'Send the file in a form field named "image"'
+          : err.message;
+    failure(res, 422, "Validation failed", { image: [message] });
+    return;
+  }
+
+  // Client errors raised by Express helpers (e.g. a missing /uploads file).
+  const status = (err as { status?: unknown } | null)?.status;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    failure(res, status, status === 404 ? "Not found" : "Bad request");
     return;
   }
 

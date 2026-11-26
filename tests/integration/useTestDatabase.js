@@ -6,3 +6,6 @@ if (!process.env.TEST_DATABASE_URL) {
 }
 
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+
+// Keep uploads from tests out of the real uploads folder.
+process.env.UPLOAD_DIR = require("path").join(require("os").tmpdir(), "besttech-test-uploads");

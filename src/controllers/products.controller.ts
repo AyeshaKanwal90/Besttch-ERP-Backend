@@ -86,3 +86,13 @@ export const remove = asyncHandler(async (req: Request, res: Response) => {
 
   res.status(204).send();
 });
+
+export const uploadImage = asyncHandler(async (req: Request, res: Response) => {
+  const product = await productsService.setProductImage(idParam(req), req.file);
+  success(res, product, "Image uploaded");
+});
+
+export const removeImage = asyncHandler(async (req: Request, res: Response) => {
+  const product = await productsService.removeProductImage(idParam(req));
+  success(res, product, "Image removed");
+});

@@ -3,6 +3,7 @@ import { prisma } from "../config/prisma";
 import { ApiError } from "../utils/ApiError";
 import { assertCategoryExists } from "./categories.service";
 import { getLowStockProductIds, isLowStock } from "./stockLevels";
+import { detectImageType, storage } from "./storage.service";
 
 interface ListProductsParams {
   search?: string;
@@ -365,4 +366,60 @@ async function assertBarcodeAvailable(barcode: string, excludeId?: number) {
       ],
     });
   }
+}
+
+/**
+ * Replaces the product's image. The new file is stored before the old
+ * one is removed, so a failed upload never leaves the product without
+ * its previous image.
+ */
+export async function setProductImage(id: number, file: Express.Multer.File | undefined) {
+  if (!file) {
+    throw ApiError.unprocessable("Validation failed", { image: ["Choose an image to upload"] });
+  }
+
+  const type = detectImageType(file.buffer);
+  if (!type) {
+    throw ApiError.unprocessable("Validation failed", {
+      image: ["The file isn't a valid JPEG, PNG, WebP or GIF image"],
+    });
+  }
+
+  const existing = await prisma.product.findFirst({ where: { id, deletedAt: null }, select: { imageUrl: true } });
+  if (!existing) {
+    throw ApiError.notFound("Product not found");
+  }
+
+  const imageUrl = await storage.save(file.buffer, { folder: "products", ...type });
+
+  const product = await prisma.product.update({
+    where: { id },
+    data: { imageUrl },
+    select: productSelect,
+  });
+
+  if (existing.imageUrl) {
+    await storage.remove(existing.imageUrl).catch(() => undefined);
+  }
+
+  return formatProduct(product);
+}
+
+export async function removeProductImage(id: number) {
+  const existing = await prisma.product.findFirst({ where: { id, deletedAt: null }, select: { imageUrl: true } });
+  if (!existing) {
+    throw ApiError.notFound("Product not found");
+  }
+
+  const product = await prisma.product.update({
+    where: { id },
+    data: { imageUrl: null },
+    select: productSelect,
+  });
+
+  if (existing.imageUrl) {
+    await storage.remove(existing.imageUrl).catch(() => undefined);
+  }
+
+  return formatProduct(product);
 }

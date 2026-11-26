@@ -46,6 +46,20 @@ export function createApp() {
   app.use(helmet());
 
   /*
+   * Uploaded files (product images). Served read-only; the frontend runs
+   * on another origin, so allow cross-origin embedding. Helmet's nosniff
+   * stays on, so browsers won't treat an image as anything else.
+   */
+  app.use(
+    "/uploads",
+    (_req, res, next) => {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      next();
+    },
+    express.static(env.uploadDir, { index: false, dotfiles: "deny", maxAge: "7d", fallthrough: false })
+  );
+
+  /*
    * CORS
    */
   app.use(
