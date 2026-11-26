@@ -70,6 +70,10 @@ const swaggerOptions: swaggerJsdoc.Options = {
         description: "Bulk receive, damage, return and correction requests with approval",
       },
       {
+        name: "Inventory Reports",
+        description: "Low stock and stock valuation",
+      },
+      {
         name: "Health",
         description: "Server health",
       },

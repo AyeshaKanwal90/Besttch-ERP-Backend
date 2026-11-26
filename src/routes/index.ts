@@ -9,6 +9,7 @@ import itemsRoutes from "./items.routes";
 import categoriesRoutes from "./categories.routes";
 import stockMovementsRoutes from "./stockMovements.routes";
 import stockAdjustmentsRoutes from "./stockAdjustments.routes";
+import { inventoryRouter, reportsRouter } from "./inventoryReports.routes";
 const router = Router();
 
 router.use("/auth", authRoutes);
@@ -21,4 +22,6 @@ router.use("/warehouses", warehousesRoutes);
 router.use("/categories", categoriesRoutes);
 router.use("/stock-movements", stockMovementsRoutes);
 router.use("/stock-adjustments", stockAdjustmentsRoutes);
+router.use("/inventory", inventoryRouter);
+router.use("/reports", reportsRouter);
 export default router;

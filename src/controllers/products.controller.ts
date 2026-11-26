@@ -12,6 +12,8 @@ import {
 
 import { parseOrThrow } from "../validators/validate";
 import * as productsService from "../services/products.service";
+import { stockByWarehouse } from "../services/inventoryReports.service";
+import { latestMovementsForProduct } from "../services/stockMovements.service";
 import { hasPermission } from "../services/permissions.service";
 import { ApiError } from "../utils/ApiError";
 
@@ -38,10 +40,20 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
   paginated(res, products, meta);
 });
 
+/**
+ * Product detail adds stock per warehouse and, for users who can see the
+ * movement history, the 10 latest movements.
+ */
 export const getOne = asyncHandler(async (req: Request, res: Response) => {
   const product = await productsService.getProductById(idParam(req));
+  const canSeeMovements = req.user ? await hasPermission(req.user.roleName, "stock_movements.view") : false;
 
-  success(res, product);
+  const [perWarehouse, latestMovements] = await Promise.all([
+    stockByWarehouse([product.id]),
+    canSeeMovements ? latestMovementsForProduct(product.id, 10) : Promise.resolve(null),
+  ]);
+
+  success(res, { ...product, stockByWarehouse: perWarehouse.get(product.id) ?? [], latestMovements });
 });
 
 export const getByBarcode = asyncHandler(
