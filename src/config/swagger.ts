@@ -62,6 +62,10 @@ const swaggerOptions: swaggerJsdoc.Options = {
         description: "Product categories",
       },
       {
+        name: "Stock Movements",
+        description: "Append-only history of every stock change",
+      },
+      {
         name: "Health",
         description: "Server health",
       },

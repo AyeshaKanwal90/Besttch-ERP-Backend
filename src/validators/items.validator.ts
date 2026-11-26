@@ -88,13 +88,25 @@ export const updateItemSchema = z.object({
 export const listItemsQuerySchema = z.object({
   search: z.string().trim().optional(),
 
-  status: z.enum(["in_stock", "sold", "removed"]).optional(),
+  status: z.enum(["in_stock", "sold", "removed", "damaged"]).optional(),
 
   productId: z.coerce.number().int().positive().optional(),
 
   warehouseId: z.coerce.number().int().positive().optional(),
 
+  categoryId: z.coerce.number().int().positive().optional(),
+
+  lowStock: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((value) => value === "true"),
+
   page: z.coerce.number().int().min(1).default(1),
 
   per_page: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+// Optional note for sell / remove / damage / return; stored on the stock movement.
+export const itemStatusChangeSchema = z.object({
+  note: z.string().trim().max(500).optional().nullable(),
 });

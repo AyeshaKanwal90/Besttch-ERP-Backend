@@ -19,10 +19,22 @@ enum MovementType {
   transfer
 }
 
+// Why stock moved. `type` says which way; `reason` says what happened.
+enum MovementReason {
+  receive
+  sale
+  removal
+  damage
+  return
+  transfer
+  correction
+}
+
 enum ItemStatus {
   in_stock
   sold
   removed
+  damaged
 }
 
 model Role {
@@ -77,7 +89,7 @@ model User {
   updatedAt   DateTime   @updatedAt @map("updated_at")
   deletedAt   DateTime?  @map("deleted_at")
 
-  stockMovements      StockMovement[]
+  stockMovements      StockMovement[]       @relation("MovementUser")
   passwordResetTokens PasswordResetToken[]
 
   @@index([roleId])
@@ -110,8 +122,10 @@ model Warehouse {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  stockMovements StockMovement[]
-  items          Item[]
+  stockMovements         StockMovement[] @relation("MovementWarehouse")
+  outgoingTransfers      StockMovement[] @relation("MovementFromWarehouse")
+  incomingTransfers      StockMovement[] @relation("MovementToWarehouse")
+  items                  Item[]
 
   @@map("warehouses")
 }
@@ -186,8 +200,9 @@ model Item {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  product   Product   @relation(fields: [productId], references: [id])
-  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  product        Product         @relation(fields: [productId], references: [id])
+  warehouse      Warehouse       @relation(fields: [warehouseId], references: [id])
+  stockMovements StockMovement[]
 
   @@index([productId])
   @@index([warehouseId])
@@ -196,23 +211,39 @@ model Item {
   @@map("items")
 }
 
-// Append-only ledger: application code must never UPDATE or DELETE rows here.
+// Append-only ledger of every stock change: application code must never
+// UPDATE or DELETE rows here. Summing `in` minus `out` per product and
+// warehouse (with transfers moving between the two) gives current stock.
 model StockMovement {
-  id          Int          @id @default(autoincrement())
-  productId   Int          @map("product_id")
-  warehouseId Int          @map("warehouse_id")
-  userId      Int          @map("user_id")
-  type        MovementType
-  quantity    Int
-  reference   String?      @db.VarChar(100)
-  note        String?      @db.Text
-  createdAt   DateTime     @default(now()) @map("created_at")
+  id              Int            @id @default(autoincrement())
+  productId       Int            @map("product_id")
+  // The warehouse whose stock changed: destination for in/transfer,
+  // source for out.
+  warehouseId     Int            @map("warehouse_id")
+  fromWarehouseId Int?           @map("from_warehouse_id")
+  toWarehouseId   Int?           @map("to_warehouse_id")
+  itemId          Int?           @map("item_id")
+  // Null for movements recorded by the system (e.g. opening balances).
+  userId          Int?           @map("user_id")
+  type            MovementType
+  reason          MovementReason
+  quantity        Int
+  reference       String?        @db.VarChar(100)
+  note            String?        @db.Text
+  createdAt       DateTime       @default(now()) @map("created_at")
 
-  product   Product   @relation(fields: [productId], references: [id])
-  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
-  user      User      @relation(fields: [userId], references: [id])
+  product       Product    @relation(fields: [productId], references: [id])
+  warehouse     Warehouse  @relation("MovementWarehouse", fields: [warehouseId], references: [id])
+  fromWarehouse Warehouse? @relation("MovementFromWarehouse", fields: [fromWarehouseId], references: [id], onDelete: Restrict)
+  toWarehouse   Warehouse? @relation("MovementToWarehouse", fields: [toWarehouseId], references: [id], onDelete: Restrict)
+  item          Item?      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  // Restrict: who made a stock change must never be lost.
+  user          User?      @relation("MovementUser", fields: [userId], references: [id], onDelete: Restrict)
 
-  @@index([productId])
+  @@index([productId, createdAt])
   @@index([warehouseId])
+  @@index([itemId])
+  @@index([userId])
+  @@index([createdAt])
   @@map("stock_movements")
 }

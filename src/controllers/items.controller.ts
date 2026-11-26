@@ -8,6 +8,7 @@ import { paginated, success } from "../utils/apiResponse";
 
 import {
   createItemSchema,
+  itemStatusChangeSchema,
   listItemsQuerySchema,
   updateItemSchema,
 } from "../validators/items.validator";
@@ -24,6 +25,8 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
     status: query.status,
     productId: query.productId,
     warehouseId: query.warehouseId,
+    categoryId: query.categoryId,
+    lowStock: query.lowStock,
     page: query.page,
     perPage: query.per_page,
   });
@@ -40,6 +43,7 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
 
   const item = await itemsService.createItem(input, {
     canCreateProducts: await hasPermission(req.user.roleName, "products.create"),
+    userId: req.user.id,
   });
 
   success(res, item, "Item added successfully", 201);
@@ -72,25 +76,41 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
 
   const item = await itemsService.updateItem(idParam(req), input, {
     canUpdatePrice: await hasPermission(req.user.roleName, "items.update_price"),
+    userId: req.user.id,
   });
 
   success(res, item, "Item updated successfully");
 });
 
+function actingUserId(req: Request): number {
+  if (!req.user) throw ApiError.unauthorized();
+  return req.user.id;
+}
+
+function noteFrom(req: Request): string | null {
+  return parseOrThrow(itemStatusChangeSchema, req.body ?? {}).note ?? null;
+}
+
 export const sell = asyncHandler(async (req: Request, res: Response) => {
-  const item = await itemsService.sellItem(idParam(req));
+  const item = await itemsService.sellItem(idParam(req), actingUserId(req), noteFrom(req));
 
   success(res, item, "Item sold successfully");
 });
 
 export const remove = asyncHandler(async (req: Request, res: Response) => {
-  const item = await itemsService.removeItem(idParam(req));
+  const item = await itemsService.removeItem(idParam(req), actingUserId(req), noteFrom(req));
 
   success(res, item, "Item removed from inventory");
 });
 
+export const damage = asyncHandler(async (req: Request, res: Response) => {
+  const item = await itemsService.damageItem(idParam(req), actingUserId(req), noteFrom(req));
+
+  success(res, item, "Item marked as damaged");
+});
+
 export const returnItem = asyncHandler(async (req: Request, res: Response) => {
-  const item = await itemsService.returnItem(idParam(req));
+  const item = await itemsService.returnItem(idParam(req), actingUserId(req), noteFrom(req));
 
   success(res, item, "Item returned to inventory");
 });

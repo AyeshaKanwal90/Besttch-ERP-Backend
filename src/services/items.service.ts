@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "../config/prisma";
 import { ApiError } from "../utils/ApiError";
+import { recordMovements } from "./stockMovements.service";
+import { getLowStockProductIds } from "./stockLevels";
 
 interface CreateItemInput {
   barcode: string;
@@ -26,13 +28,18 @@ interface UpdateItemInput {
   warehouseId?: number;
 }
 
+export type ItemStatusValue = "in_stock" | "sold" | "removed" | "damaged";
+
 interface ListItemsParams {
   search?: string;
 
-  status?: "in_stock" | "sold" | "removed";
+  status?: ItemStatusValue;
 
   productId?: number;
   warehouseId?: number;
+  categoryId?: number;
+  /** Only items of products at or below their reorder level. */
+  lowStock?: boolean;
 
   page: number;
   perPage: number;
@@ -56,6 +63,9 @@ const itemSelect = {
       name: true,
       description: true,
       unit: true,
+      imageUrl: true,
+      reorderLevel: true,
+      category: { select: { id: true, name: true } },
     },
   },
 
@@ -78,7 +88,7 @@ const itemSelect = {
  */
 export async function createItem(
   input: CreateItemInput,
-  options: { canCreateProducts: boolean }
+  options: { canCreateProducts: boolean; userId: number }
 ) {
   await assertWarehouseExists(input.warehouseId);
 
@@ -218,6 +228,18 @@ export async function createItem(
       select: itemSelect,
     });
 
+    await recordMovements(tx, [
+      {
+        productId: product.id,
+        warehouseId: input.warehouseId,
+        itemId: item.id,
+        type: "in",
+        reason: "receive",
+        quantity: 1,
+        userId: options.userId,
+      },
+    ]);
+
     return item;
   });
 }
@@ -307,7 +329,17 @@ export async function listItems(params: ListItemsParams) {
     }
   }
 
+  const lowStockIds = params.lowStock ? await getLowStockProductIds() : undefined;
+
   const where: Prisma.ItemWhereInput = {
+    ...(params.categoryId ? { product: { categoryId: params.categoryId } } : {}),
+
+    ...(lowStockIds && !params.productId ? { productId: { in: lowStockIds } } : {}),
+
+    ...(lowStockIds && params.productId && !lowStockIds.includes(params.productId)
+      ? { id: { in: [] } }
+      : {}),
+
     ...(params.status
       ? {
           status: params.status,
@@ -439,7 +471,7 @@ export async function getItemByCode(itemCode: string) {
 export async function updateItem(
   id: number,
   input: UpdateItemInput,
-  options: { canUpdatePrice: boolean }
+  options: { canUpdatePrice: boolean; userId: number }
 ) {
   const item = await prisma.item.findUnique({
     where: {
@@ -477,11 +509,19 @@ export async function updateItem(
    * Validate warehouse if it
    * is being changed.
    */
-  if (input.warehouseId !== undefined) {
-    await assertWarehouseExists(input.warehouseId);
+  const moving = input.warehouseId !== undefined && input.warehouseId !== item.warehouseId;
+
+  if (moving) {
+    await assertWarehouseExists(input.warehouseId!);
+
+    // Only stock that's physically on hand can change warehouse.
+    if (item.status !== "in_stock") {
+      throw ApiError.unprocessable("Only items in stock can be moved to another warehouse");
+    }
   }
 
-  return prisma.item.update({
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.item.update({
     where: {
       id,
     },
@@ -505,7 +545,7 @@ export async function updateItem(
           }
         : {}),
 
-      ...(input.warehouseId !== undefined
+      ...(moving
         ? {
             warehouseId: input.warehouseId,
           }
@@ -513,6 +553,25 @@ export async function updateItem(
     },
 
     select: itemSelect,
+    });
+
+    if (moving) {
+      await recordMovements(tx, [
+        {
+          productId: item.productId,
+          warehouseId: input.warehouseId!,
+          fromWarehouseId: item.warehouseId,
+          toWarehouseId: input.warehouseId!,
+          itemId: item.id,
+          type: "transfer",
+          reason: "transfer",
+          quantity: 1,
+          userId: options.userId,
+        },
+      ]);
+    }
+
+    return updated;
   });
 }
 
@@ -523,30 +582,46 @@ export async function updateItem(
  * because Product quantity counts only
  * items whose status = in_stock.
  */
-export async function sellItem(id: number) {
-  return changeStatus(id, "sold");
+export async function sellItem(id: number, userId: number, note?: string | null) {
+  return changeStatus(id, "sold", userId, note);
 }
 
 /**
- * REMOVE ITEM
+ * REMOVE ITEM (written off, lost, etc.)
  */
-export async function removeItem(id: number) {
-  return changeStatus(id, "removed");
+export async function removeItem(id: number, userId: number, note?: string | null) {
+  return changeStatus(id, "removed", userId, note);
 }
 
 /**
- * RETURN ITEM TO STOCK
+ * MARK ITEM DAMAGED
  */
-export async function returnItem(id: number) {
-  return changeStatus(id, "in_stock");
+export async function damageItem(id: number, userId: number, note?: string | null) {
+  return changeStatus(id, "damaged", userId, note);
 }
+
+/**
+ * RETURN ITEM TO STOCK (from sold, removed or damaged)
+ */
+export async function returnItem(id: number, userId: number, note?: string | null) {
+  return changeStatus(id, "in_stock", userId, note);
+}
+
+const STATUS_MOVEMENT = {
+  sold: { type: "out", reason: "sale" },
+  removed: { type: "out", reason: "removal" },
+  damaged: { type: "out", reason: "damage" },
+  in_stock: { type: "in", reason: "return" },
+} as const;
 
 /**
  * INTERNAL STATUS HANDLER
  */
 async function changeStatus(
   id: number,
-  status: "in_stock" | "sold" | "removed"
+  status: ItemStatusValue,
+  userId: number,
+  note?: string | null
 ) {
   const item = await prisma.item.findUnique({
     where: {
@@ -574,16 +649,31 @@ async function changeStatus(
     throw ApiError.unprocessable("Item is already in stock");
   }
 
-  return prisma.item.update({
-    where: {
-      id,
-    },
+  return prisma.$transaction(async (tx) => {
+    // Conditional update: if another request changed the status since we
+    // read it, nothing matches and the change is refused.
+    const claimed = await tx.item.updateMany({
+      where: { id, status: item.status },
+      data: { status },
+    });
 
-    data: {
-      status,
-    },
+    if (claimed.count !== 1) {
+      throw ApiError.unprocessable("The item was changed by someone else. Refresh and try again.");
+    }
 
-    select: itemSelect,
+    await recordMovements(tx, [
+      {
+        productId: item.productId,
+        warehouseId: item.warehouseId,
+        itemId: item.id,
+        ...STATUS_MOVEMENT[status],
+        quantity: 1,
+        userId,
+        note: note ?? null,
+      },
+    ]);
+
+    return tx.item.findUniqueOrThrow({ where: { id }, select: itemSelect });
   });
 }
 

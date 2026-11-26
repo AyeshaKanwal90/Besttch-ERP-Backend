@@ -382,4 +382,25 @@ router.post("/:id/remove", requireAuth, requirePermission("items.change_status")
  */
 router.post("/:id/return", requireAuth, requirePermission("items.change_status"), itemsController.returnItem);
 
+/**
+ * @openapi
+ * /items/{id}/damage:
+ *   post:
+ *     tags:
+ *       - Items
+ *     summary: Mark item as damaged
+ *     description: >
+ *       Changes an in-stock item's status to damaged and records an "out"
+ *       stock movement with reason "damage". Requires `items.change_status`.
+ *       Optional body { note }. Damaged items can be returned to stock.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: integer } }
+ *     responses:
+ *       200:
+ *         description: Item marked as damaged
+ *       422:
+ *         description: Item is not currently in stock
+ */
+router.post("/:id/damage", requireAuth, requirePermission("items.change_status"), itemsController.damage);
+
 export default router;

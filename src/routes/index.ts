@@ -7,6 +7,7 @@ import dashboardRoutes from "./dashboard.routes";
 import productsRoutes from "./products.routes";
 import itemsRoutes from "./items.routes";
 import categoriesRoutes from "./categories.routes";
+import stockMovementsRoutes from "./stockMovements.routes";
 const router = Router();
 
 router.use("/auth", authRoutes);
@@ -17,4 +18,5 @@ router.use("/products", productsRoutes);
 router.use("/items", itemsRoutes);
 router.use("/warehouses", warehousesRoutes);
 router.use("/categories", categoriesRoutes);
+router.use("/stock-movements", stockMovementsRoutes);
 export default router;

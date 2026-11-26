@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import * as productsController from "../controllers/products.controller";
+import * as movementsController from "../controllers/stockMovements.controller";
 import { requireAuth, requirePermission } from "../middleware/auth";
 import { singleImageUpload } from "../middleware/upload";
 
@@ -269,6 +270,26 @@ router.delete("/:id", requireAuth, requirePermission("products.delete"), product
  *       200:
  *         description: Image removed
  */
+/**
+ * @openapi
+ * /products/{id}/movements:
+ *   get:
+ *     tags:
+ *       - Stock Movements
+ *     summary: Stock movement history for one product
+ *     description: >
+ *       Same filters and paging as GET /stock-movements, limited to this
+ *       product. Requires `stock_movements.view`.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: integer } }
+ *     responses:
+ *       200:
+ *         description: Movements retrieved
+ *       404:
+ *         description: Product not found
+ */
+router.get("/:id/movements", requireAuth, requirePermission("stock_movements.view"), movementsController.listForProduct);
+
 router.post("/:id/image", requireAuth, requirePermission("products.update"), singleImageUpload, productsController.uploadImage);
 router.delete("/:id/image", requireAuth, requirePermission("products.update"), productsController.removeImage);
 

@@ -17,6 +17,11 @@ jest.mock("../src/config/prisma", () => {
       count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+    },
+    stockMovement: {
+      createMany: jest.fn(),
     },
     rolePermission: {
       findMany: jest.fn(),
@@ -59,6 +64,7 @@ const db = prisma as unknown as {
   item: Record<string, jest.Mock>;
   warehouse: Record<string, jest.Mock>;
   rolePermission: Record<string, jest.Mock>;
+  stockMovement: Record<string, jest.Mock>;
   user: Record<string, jest.Mock>;
 };
 
@@ -87,7 +93,7 @@ function prismaKnownError(code: string, meta?: Record<string, unknown>) {
 }
 
 beforeEach(() => {
-  for (const model of [db.product, db.item, db.warehouse]) {
+  for (const model of [db.product, db.item, db.warehouse, db.stockMovement]) {
     Object.values(model).forEach((fn) => fn.mockReset());
   }
   useDefaultPermissions(db.rolePermission.findMany);
@@ -386,7 +392,7 @@ describe("POST /api/items", () => {
 describe("Prisma not-found errors", () => {
   it("maps P2025 to 404", async () => {
     db.item.findUnique.mockResolvedValue(storedItem());
-    db.item.update.mockRejectedValue(prismaKnownError("P2025"));
+    db.item.updateMany.mockRejectedValue(prismaKnownError("P2025"));
 
     const res = await request(app)
       .post("/api/items/1/sell")
